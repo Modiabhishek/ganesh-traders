@@ -87,3 +87,26 @@ def startup_event():
 @app.get("/")
 def read_root():
     return {"status": "healthy", "service": "Family Business Management System API"}
+
+from .services.auth import verify_password
+@app.get("/api/debug/admin")
+def debug_admin():
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.username == "admin").first()
+        if not admin:
+            return {"status": "error", "message": "Admin user not found in database"}
+        
+        verifies = verify_password("adminpass", admin.password_hash)
+        return {
+            "status": "success",
+            "username": admin.username,
+            "role": admin.role,
+            "user_status": admin.status,
+            "password_hash": admin.password_hash,
+            "verifies_correctly": verifies
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
