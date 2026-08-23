@@ -4,8 +4,20 @@ import { Search, Printer, Trash2, ArrowLeft, Loader, Calendar, FileText, CheckCi
 
 const parseNaiveDate = (dateStr) => {
   if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
   try {
-    const parts = dateStr.split('T');
+    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
+    let workingStr = dateStr;
+    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+      workingStr = dateStr + 'Z';
+    }
+
+    // If it has a timezone offset, let the browser parse it natively to handle local timezone conversion.
+    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
+      return new Date(workingStr);
+    }
+    // Otherwise, parse it as a local naive date.
+    const parts = workingStr.replace('T', ' ').split(' ');
     const dateParts = parts[0].split('-');
     const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
     return new Date(
