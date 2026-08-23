@@ -34,6 +34,33 @@ def startup_event():
         db.execute(text("UPDATE users SET status = 'Active' WHERE status IS NULL OR status = ''"))
         db.commit()
 
+        # Customer portal database migrations
+        try:
+            db.execute(text("ALTER TABLE customers ADD COLUMN portal_username VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+        try:
+            db.execute(text("ALTER TABLE customers ADD COLUMN portal_password_hash VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+        try:
+            db.execute(text("ALTER TABLE customers ADD COLUMN portal_status VARCHAR DEFAULT 'Blocked'"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        # Seed initial Live Updates announcement
+        from .models.customer import LiveUpdate
+        exists_update = db.query(LiveUpdate).first()
+        if not exists_update:
+            db.add(LiveUpdate(
+                title="Welcome to Ganesh Traders Portal!",
+                content="Dear valued customers, we have launched our online portal where you can check your live dues, view ledger history, and see current crop rates. Thank you for your continued partnership!"
+            ))
+            db.commit()
+
         # Seed default admin user
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:

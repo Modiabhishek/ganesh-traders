@@ -19,8 +19,15 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
     payment_type: 'Cash',
     opening_balance: '0.00',
     credit_limit: '0.00',
-    notes: ''
+    notes: '',
+    portal_username: '',
+    portal_password: '',
+    portal_status: 'Blocked'
   });
+  
+  // Edit Customer Modal State
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   
   // Receive Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -83,12 +90,49 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
         payment_type: 'Cash',
         opening_balance: '0.00',
         credit_limit: '0.00',
-        notes: ''
+        notes: '',
+        portal_username: '',
+        portal_password: '',
+        portal_status: 'Blocked'
       });
       loadCustomers();
     } catch (err) {
       console.error(err);
       const detail = err.response?.data?.detail || 'Failed to create customer.';
+      setMessage({ text: detail, type: 'danger' });
+    }
+  };
+
+  const handleUpdateCustomer = async (e) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    try {
+      if (editingCustomer.mobile && !/^\d{10}$/.test(editingCustomer.mobile)) {
+        setMessage({ text: 'Mobile number must be exactly 10 digits.', type: 'danger' });
+        return;
+      }
+
+      await customerAPI.updateCustomer(editingCustomer.id, {
+        name: editingCustomer.name,
+        mobile: editingCustomer.mobile || null,
+        address: editingCustomer.address || null,
+        customer_type: editingCustomer.customer_type,
+        payment_type: editingCustomer.payment_type,
+        credit_limit: parseFloat(editingCustomer.credit_limit || 0),
+        notes: editingCustomer.notes || null,
+        portal_username: editingCustomer.portal_username || null,
+        portal_password: editingCustomer.portal_password || null,
+        portal_status: editingCustomer.portal_status || 'Blocked'
+      });
+
+      setMessage({ text: 'Customer updated successfully.', type: 'success' });
+      setShowEditForm(false);
+      setEditingCustomer(null);
+      loadCustomers();
+      setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+    } catch (err) {
+      console.error(err);
+      const detail = err.response?.data?.detail || 'Failed to update customer.';
       setMessage({ text: detail, type: 'danger' });
     }
   };
@@ -221,6 +265,28 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
             <label className="form-label">Notes</label>
             <input type="text" className="input-field" placeholder="Any special instructions..." value={newCustomer.notes} onChange={e => setNewCustomer({ ...newCustomer, notes: e.target.value })} />
           </div>
+
+          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-color)', margin: '1rem 0', padding: '0.75rem 0 0 0' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.75rem' }}>Customer Portal Login Settings</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Portal Username (Optional)</label>
+                <input type="text" className="input-field" placeholder="e.g. ramesh123" value={newCustomer.portal_username} onChange={e => setNewCustomer({ ...newCustomer, portal_username: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Portal Password (Optional)</label>
+                <input type="password" className="input-field" placeholder="Set login password" value={newCustomer.portal_password} onChange={e => setNewCustomer({ ...newCustomer, portal_password: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Portal Access</label>
+                <select className="input-field" value={newCustomer.portal_status} onChange={e => setNewCustomer({ ...newCustomer, portal_status: e.target.value })}>
+                  <option value="Blocked">Blocked (बंद)</option>
+                  <option value="Allowed">Allowed (चालू)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>Cancel</button>
             <button type="submit" className="btn btn-primary">Save Profile</button>
@@ -333,6 +399,20 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
                       
                       <button 
                         className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setEditingCustomer({
+                            ...c,
+                            portal_password: ''
+                          });
+                          setShowEditForm(true);
+                        }}
+                        title="Edit Customer Details & Credentials"
+                      >
+                        Edit
+                      </button>
+
+                      <button 
+                        className="btn btn-secondary btn-sm"
                         style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fee2e2' }}
                         onClick={() => handleDeleteCustomer(c)}
                         title="Delete Customer"
@@ -410,6 +490,81 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ background: 'var(--success)', color: 'white' }}>Confirm Payment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer Modal */}
+      {showEditForm && editingCustomer && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '480px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', maxHeight: '90vh', overflowY: 'auto', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Customer & Portal</h2>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => { setShowEditForm(false); setEditingCustomer(null); }} />
+            </div>
+            
+            <form onSubmit={handleUpdateCustomer}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Full Name *</label>
+                <input type="text" className="input-field" required value={editingCustomer.name} onChange={e => setEditingCustomer({ ...editingCustomer, name: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Mobile Number</label>
+                <input type="text" className="input-field" placeholder="10-digit number" value={editingCustomer.mobile || ''} onChange={e => setEditingCustomer({ ...editingCustomer, mobile: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Address</label>
+                <input type="text" className="input-field" value={editingCustomer.address || ''} onChange={e => setEditingCustomer({ ...editingCustomer, address: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Customer Type</label>
+                <select className="input-field" value={editingCustomer.customer_type} onChange={e => setEditingCustomer({ ...editingCustomer, customer_type: e.target.value })}>
+                  <option value="Retail">Retail (फुटकर)</option>
+                  <option value="Wholesale">Wholesale (थोक)</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Payment Terms</label>
+                <select className="input-field" value={editingCustomer.payment_type} onChange={e => setEditingCustomer({ ...editingCustomer, payment_type: e.target.value })}>
+                  <option value="Cash">Cash (नकद)</option>
+                  <option value="Monthly Credit">Monthly Credit (उधार खाता)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Credit Limit (₹)</label>
+                <input type="number" step="0.01" className="input-field" value={editingCustomer.credit_limit} onChange={e => setEditingCustomer({ ...editingCustomer, credit_limit: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Notes</label>
+                <input type="text" className="input-field" value={editingCustomer.notes || ''} onChange={e => setEditingCustomer({ ...editingCustomer, notes: e.target.value })} />
+              </div>
+
+              {/* Portal credentials */}
+              <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1rem', paddingTop: '1rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.75rem' }}>Client Portal Access Settings</h3>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Portal Username (Portal Login ID)</label>
+                  <input type="text" className="input-field" placeholder="Create username (unique)" value={editingCustomer.portal_username || ''} onChange={e => setEditingCustomer({ ...editingCustomer, portal_username: e.target.value })} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Portal Password (Optional / leave blank to keep current)</label>
+                  <input type="password" className="input-field" placeholder="Enter new password to change" value={editingCustomer.portal_password || ''} onChange={e => setEditingCustomer({ ...editingCustomer, portal_password: e.target.value })} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Portal Access Status</label>
+                  <select className="input-field" value={editingCustomer.portal_status} onChange={e => setEditingCustomer({ ...editingCustomer, portal_status: e.target.value })}>
+                    <option value="Blocked">Blocked (बंद - No Access)</option>
+                    <option value="Allowed">Allowed (चालू - Portal Enabled)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditForm(false); setEditingCustomer(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
               </div>
             </form>
           </div>

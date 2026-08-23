@@ -22,6 +22,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
   const [txRate, setTxRate] = useState('');
   const [txBags, setTxBags] = useState('');
   const [txNotes, setTxNotes] = useState('');
+  const [editingTx, setEditingTx] = useState(null);
 
   // Crop Add/Modify Modal
   const [showCropModal, setShowCropModal] = useState(false);
@@ -153,13 +154,22 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
     };
 
     try {
-      await cerealAPI.createTransaction(payload);
-      setMessage({ 
-        text: `Successfully recorded ${txType === 'BUY' ? 'purchase from farmer' : 'bulk dispatch'} for ${selectedProduct.name}!`, 
-        type: 'success' 
-      });
+      if (editingTx) {
+        await cerealAPI.updateTransaction(editingTx.id, payload);
+        setMessage({ 
+          text: `Successfully updated transaction for ${selectedProduct.name}!`, 
+          type: 'success' 
+        });
+      } else {
+        await cerealAPI.createTransaction(payload);
+        setMessage({ 
+          text: `Successfully recorded ${txType === 'BUY' ? 'purchase from farmer' : 'bulk dispatch'} for ${selectedProduct.name}!`, 
+          type: 'success' 
+        });
+      }
       setShowTxModal(false);
       setSelectedProduct(null);
+      setEditingTx(null);
       setTxWeight('');
       setTxRate('');
       setTxBags('');
@@ -169,7 +179,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
       setTimeout(() => setMessage({ text: '', type: '' }), 4000);
     } catch (err) {
       console.error(err);
-      setMessage({ text: 'Failed to record transaction. Check backend connection.', type: 'danger' });
+      setMessage({ text: 'Failed to record/update transaction. Check backend connection.', type: 'danger' });
     }
   };
 
@@ -529,12 +539,13 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Total Amount (₹)</th>
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Bags/Kattas</th>
                   <th style={{ padding: '1rem' }}>Remarks / Farmer / Buyer</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }} className="no-print">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No trade transactions recorded yet.</td>
+                    <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No trade transactions recorded yet.</td>
                   </tr>
                 ) : (
                   transactions.map(t => {
@@ -563,6 +574,27 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
                           {t.bags ? `${t.bags} kattas` : 'N/A'}
                         </td>
                         <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{t.notes || 'No remarks'}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }} className="no-print">
+                          <button 
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              const crop = products.find(p => p.id === t.product_id);
+                              if (crop) {
+                                setSelectedProduct(crop);
+                                setTxType(t.transaction_type);
+                                setTxWeight(parseFloat(t.weight).toString());
+                                setTxUnit(t.unit);
+                                setTxRate(parseFloat(t.rate).toString());
+                                setTxBags(t.bags ? t.bags.toString() : '');
+                                setTxNotes(t.notes || '');
+                                setEditingTx(t);
+                                setShowTxModal(true);
+                              }
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     );
                   })

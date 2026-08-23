@@ -175,7 +175,9 @@ def list_sales(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Sale).filter(Sale.status == "Active")
-    if customer_id:
+    if current_user.role == "Customer":
+        query = query.filter(Sale.customer_id == current_user.id)
+    elif customer_id:
         query = query.filter(Sale.customer_id == customer_id)
     return query.order_by(Sale.sale_date.desc()).all()
 
@@ -186,7 +188,9 @@ def list_payments(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(CustomerPayment).filter(CustomerPayment.status == "Active")
-    if customer_id:
+    if current_user.role == "Customer":
+        query = query.filter(CustomerPayment.customer_id == current_user.id)
+    elif customer_id:
         query = query.filter(CustomerPayment.customer_id == customer_id)
     return query.order_by(CustomerPayment.payment_date.desc()).all()
 
@@ -365,6 +369,91 @@ def create_cereal_transaction(
 @router.get("/cereals", response_model=List[CerealTransactionResponse])
 def get_cereal_transactions(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     return db.query(CerealTransaction).order_by(CerealTransaction.created_at.desc()).all()
+
+@router.put("/cereals/{tx_id}", response_model=CerealTransactionResponse)
+def update_cereal_transaction(
+    tx_id: int,
+    tx_in: CerealTransactionCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    tx = db.query(CerealTransaction).filter(CerealTransaction.id == tx_id).first()
+    if not tx:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
+
+    product = db.query(Product).filter(Product.id == tx.product_id).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+
+    # 1. Reverse the old stock change
+    old_weight = Decimal(str(tx.weight))
+    old_weight_adjusted = old_weight
+    if tx.unit == "kg" and product.unit == "quintal":
+        old_weight_adjusted = old_weight / Decimal("100")
+    elif tx.unit == "quintal" and product.unit == "kg":
+        old_weight_adjusted = old_weight * Decimal("100")
+
+    if tx.transaction_type == "BUY":
+        product.current_stock -= old_weight_adjusted
+    else:
+        product.current_stock += old_weight_adjusted
+
+    # 2. Apply the new stock change
+    new_weight = Decimal(str(tx_in.weight))
+    new_weight_adjusted = new_weight
+    if tx_in.unit == "kg" and product.unit == "quintal":
+        new_weight_adjusted = new_weight / Decimal("100")
+    elif tx_in.unit == "quintal" and product.unit == "kg":
+        new_weight_adjusted = new_weight * Decimal("100")
+
+    if tx_in.transaction_type == "BUY":
+        product.current_stock += new_weight_adjusted
+        rate_adjusted = Decimal(str(tx_in.rate))
+        if tx_in.unit == "kg" and product.unit == "quintal":
+            rate_adjusted = Decimal(str(tx_in.rate)) * Decimal("100")
+        elif tx_in.unit == "quintal" and product.unit == "kg":
+            rate_adjusted = Decimal(str(tx_in.rate)) / Decimal("100")
+        product.purchase_price = rate_adjusted
+    else:
+        product.current_stock -= new_weight_adjusted
+        rate_adjusted = Decimal(str(tx_in.rate))
+        if tx_in.unit == "kg" and product.unit == "quintal":
+            rate_adjusted = Decimal(str(tx_in.rate)) * Decimal("100")
+        elif tx_in.unit == "quintal" and product.unit == "kg":
+            rate_adjusted = Decimal(str(tx_in.rate)) / Decimal("100")
+        product.selling_price = rate_adjusted
+
+    # 3. Update CerealTransaction record
+    tx.weight = tx_in.weight
+    tx.unit = tx_in.unit
+    tx.rate = tx_in.rate
+    tx.total_amount = Decimal(str(tx_in.weight)) * Decimal(str(tx_in.rate))
+    tx.bags = tx_in.bags
+    tx.notes = tx_in.notes
+    tx.transaction_type = tx_in.transaction_type
+    tx.product_id = tx_in.product_id
+
+    # Log in StockMovement
+    notes_movement = f"EDIT Cereal Tx {tx_id}: {new_weight} {tx_in.unit} @ ₹{tx_in.rate}"
+    if tx_in.bags:
+        notes_movement += f" ({tx_in.bags} Kattas/Bags)"
+    if tx_in.notes:
+        notes_movement += f" | {tx_in.notes}"
+
+    db.add(StockMovement(
+        product_id=tx_in.product_id,
+        movement_type="ADJUSTMENT",
+        quantity=new_weight_adjusted - old_weight_adjusted if tx_in.transaction_type == "BUY" else old_weight_adjusted - new_weight_adjusted,
+        reference_type="CerealTransaction",
+        notes=notes_movement
+    ))
+
+    db.commit()
+    db.refresh(tx)
+    return tx

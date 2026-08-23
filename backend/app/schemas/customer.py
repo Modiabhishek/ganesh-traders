@@ -14,7 +14,9 @@ class CustomerBase(BaseModel):
     notes: Optional[str] = None
 
 class CustomerCreate(CustomerBase):
-    pass
+    portal_username: Optional[str] = None
+    portal_password: Optional[str] = None
+    portal_status: Optional[str] = "Blocked"
 
 class CustomerUpdate(BaseModel):
     name: Optional[str] = None
@@ -25,12 +27,17 @@ class CustomerUpdate(BaseModel):
     credit_limit: Optional[Decimal] = None
     status: Optional[str] = Field(None, pattern="^(Active|Inactive)$")
     notes: Optional[str] = None
+    portal_username: Optional[str] = None
+    portal_password: Optional[str] = None
+    portal_status: Optional[str] = Field(None, pattern="^(Allowed|Blocked)$")
 
 class CustomerResponse(CustomerBase):
     id: int
     customer_code: str
     current_balance: Decimal
     status: str
+    portal_username: Optional[str]
+    portal_status: str
     created_at: datetime
     updated_at: datetime
 

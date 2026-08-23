@@ -104,6 +104,22 @@ export const customerAPI = {
   getLedger: async (id) => {
     const response = await api.get(`/customers/${id}/ledger`);
     return response.data;
+  },
+  getPortalProfile: async () => {
+    const response = await api.get('/customers/portal/profile');
+    return response.data;
+  },
+  getLiveUpdates: async () => {
+    const response = await api.get('/customers/live-updates/all');
+    return response.data;
+  },
+  addLiveUpdate: async (data) => {
+    const response = await api.post('/customers/live-updates/add', data);
+    return response.data;
+  },
+  deleteLiveUpdate: async (id) => {
+    const response = await api.delete(`/customers/live-updates/${id}`);
+    return response.data;
   }
 };
 
@@ -185,6 +201,10 @@ export const transactionAPI = {
 export const cerealAPI = {
   createTransaction: async (txData) => {
     const response = await api.post('/transactions/cereals', txData);
+    return response.data;
+  },
+  updateTransaction: async (id, txData) => {
+    const response = await api.put(`/transactions/cereals/${id}`, txData);
     return response.data;
   },
   getTransactions: async () => {

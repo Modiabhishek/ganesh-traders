@@ -10,7 +10,23 @@ import CerealStock from './pages/CerealStock';
 import TransactionHistory from './pages/TransactionHistory';
 import StaffManager from './pages/StaffManager';
 import ExpenseManager from './pages/ExpenseManager';
-import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout } from 'lucide-react';
+import CustomerPortal from './pages/CustomerPortal';
+import AnnouncementManager from './pages/AnnouncementManager';
+import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout, Bell } from 'lucide-react';
+
+const decodeToken = (token) => {
+  if (!token) return null;
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -79,7 +95,7 @@ function App() {
       if (!err.response || (err.message && err.message.toLowerCase().includes('network error'))) {
         setAuthError(`Connection failed! Make sure your phone is on the same Wi-Fi, the server PC is running, and the IP address below is correct.`);
       } else {
-        setAuthError('Incorrect username or password. Check seeds (admin / adminpass).');
+        setAuthError('Incorrect username or password.');
       }
     } finally {
       setLoading(false);
@@ -138,10 +154,6 @@ function App() {
             </button>
           </form>
 
-          <footer style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Use seeded admin credentials: <strong>admin</strong> / <strong>adminpass</strong>
-          </footer>
-
           {isCapacitor && (
             <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', animation: 'fadeIn 0.3s ease' }}>
               <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
@@ -168,6 +180,13 @@ function App() {
     );
   }
 
+  const userPayload = decodeToken(token);
+  const userRole = userPayload?.role || null;
+
+  if (userRole === 'Customer') {
+    return <CustomerPortal token={token} onLogout={handleLogout} />;
+  }
+
   // Render Page Content Component
   const renderPage = () => {
     switch (currentPage) {
@@ -185,6 +204,8 @@ function App() {
         return <ProductCatalog setCurrentPage={navigateTo} goBack={goBack} />;
       case 'cereal-stock':
         return <CerealStock setCurrentPage={navigateTo} goBack={goBack} />;
+      case 'announcements':
+        return <AnnouncementManager setCurrentPage={navigateTo} goBack={goBack} />;
       case 'transactions':
         return <TransactionHistory setCurrentPage={navigateTo} goBack={goBack} />;
       case 'expenses':
@@ -245,6 +266,14 @@ function App() {
             onClick={() => navigateTo('cereal-stock')}
           >
             <Sprout size={18} style={{ color: '#eab308' }} /> Crop Stock (अनाज)
+          </button>
+
+          <button 
+            className={`btn ${currentPage === 'announcements' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ justifyContent: 'flex-start', border: currentPage === 'announcements' ? 'none' : '1px solid transparent' }}
+            onClick={() => navigateTo('announcements')}
+          >
+            <Bell size={18} style={{ color: '#ec4899' }} /> Live Updates (घोषणाएं)
           </button>
 
           <button 

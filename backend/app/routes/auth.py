@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
+from ..models.customer import Customer
 from ..schemas.user import UserCreate, UserResponse, Token
 from ..services.auth import verify_password, get_password_hash, create_access_token
 
@@ -38,16 +39,30 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # 1. Check User table (Staff / Admin)
     user = db.query(User).filter(User.username == form_data.username, User.status == "Active").first()
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if user and verify_password(form_data.password, user.password_hash):
+        access_token = create_access_token(data={"sub": user.username, "role": user.role})
+        return {"access_token": access_token, "token_type": "bearer"}
 
-    access_token = create_access_token(data={"sub": user.username, "role": user.role})
-    return {"access_token": access_token, "token_type": "bearer"}
+    # 2. Check Customer table (portal credentials)
+    customer = db.query(Customer).filter(Customer.portal_username == form_data.username, Customer.status == "Active").first()
+    if customer:
+        if customer.portal_status != "Allowed":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Portal access is blocked by administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if customer.portal_password_hash and verify_password(form_data.password, customer.portal_password_hash):
+            access_token = create_access_token(data={"sub": customer.portal_username, "role": "Customer"})
+            return {"access_token": access_token, "token_type": "bearer"}
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 from ..dependencies.auth import get_current_user
 from typing import List

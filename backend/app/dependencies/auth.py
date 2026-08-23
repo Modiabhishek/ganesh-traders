@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models.user import User
+from ..models.customer import Customer
 from ..schemas.user import TokenData
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
@@ -27,7 +28,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     user = db.query(User).filter(User.username == token_data.username, User.status == "Active").first()
     if user is None:
-        raise credentials_exception
+        customer = db.query(Customer).filter(Customer.portal_username == token_data.username, Customer.portal_status == "Allowed", Customer.status == "Active").first()
+        if customer is None:
+            raise credentials_exception
+        
+        class AuthUser:
+            def __init__(self, id, username, role):
+                self.id = id
+                self.username = username
+                self.role = role
+                self.status = "Active"
+        return AuthUser(id=customer.id, username=customer.portal_username, role="Customer")
     return user
 
 def get_admin_user(current_user: User = Depends(get_current_user)) -> User:

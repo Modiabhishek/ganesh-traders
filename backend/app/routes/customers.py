@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal
 from ..database import get_db
-from ..models.customer import Customer
+from ..models.customer import Customer, LiveUpdate
 from ..models.transaction import Sale, CustomerPayment
 from ..schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse, CustomerImportPreview
 from ..services.customer_import import parse_csv_for_preview
 from ..dependencies.auth import get_current_user
 from ..models.user import User
+from ..services.auth import get_password_hash
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -54,6 +55,16 @@ def create_customer(
         if dup:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Customer with mobile {customer_in.mobile} already exists.")
 
+    if customer_in.portal_username:
+        dup_u = db.query(User).filter(User.username == customer_in.portal_username).first()
+        dup_c = db.query(Customer).filter(Customer.portal_username == customer_in.portal_username).first()
+        if dup_u or dup_c:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Portal username already exists.")
+
+    pw_hash = None
+    if customer_in.portal_password:
+        pw_hash = get_password_hash(customer_in.portal_password)
+
     code = generate_customer_code(db)
     new_cust = Customer(
         customer_code=code,
@@ -65,7 +76,10 @@ def create_customer(
         opening_balance=customer_in.opening_balance,
         current_balance=customer_in.opening_balance,
         credit_limit=customer_in.credit_limit,
-        notes=customer_in.notes
+        notes=customer_in.notes,
+        portal_username=customer_in.portal_username,
+        portal_password_hash=pw_hash,
+        portal_status=customer_in.portal_status or "Blocked"
     )
     db.add(new_cust)
     db.commit()
@@ -94,7 +108,21 @@ def update_customer(
     if not cust:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
 
-    for field, val in customer_in.model_dump(exclude_unset=True).items():
+    update_data = customer_in.model_dump(exclude_unset=True)
+
+    if "portal_username" in update_data and update_data["portal_username"]:
+        username = update_data["portal_username"]
+        dup_u = db.query(User).filter(User.username == username).first()
+        dup_c = db.query(Customer).filter(Customer.portal_username == username, Customer.id != customer_id).first()
+        if dup_u or dup_c:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Portal username already exists.")
+
+    if "portal_password" in update_data:
+        pw = update_data.pop("portal_password")
+        if pw:
+            cust.portal_password_hash = get_password_hash(pw)
+
+    for field, val in update_data.items():
         setattr(cust, field, val)
 
     db.commit()
@@ -147,8 +175,11 @@ def import_confirm(
 def get_customer_ledger(
     customer_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
+    if current_user.role == "Customer" and customer_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. You can only view your own ledger.")
+
     cust = db.query(Customer).filter(Customer.id == customer_id, Customer.status == "Active").first()
     if not cust:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
@@ -250,3 +281,56 @@ def delete_customer(
     cust.status = "Inactive"
     db.commit()
     return {"message": "Customer deleted successfully."}
+
+@router.get("/portal/profile", response_model=CustomerResponse)
+def get_portal_profile(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role != "Customer":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only customers can view this profile.")
+    cust = db.query(Customer).filter(Customer.id == current_user.id, Customer.status == "Active").first()
+    if not cust:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    return cust
+
+from pydantic import BaseModel
+class LiveUpdateCreate(BaseModel):
+    title: str
+    content: str
+
+@router.get("/live-updates/all")
+def get_live_updates(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    return db.query(LiveUpdate).order_by(LiveUpdate.created_at.desc()).all()
+
+@router.post("/live-updates/add")
+def create_live_update(
+    update_in: LiveUpdateCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+    new_update = LiveUpdate(title=update_in.title, content=update_in.content)
+    db.add(new_update)
+    db.commit()
+    db.refresh(new_update)
+    return new_update
+
+@router.delete("/live-updates/{update_id}")
+def delete_live_update(
+    update_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+    update = db.query(LiveUpdate).filter(LiveUpdate.id == update_id).first()
+    if not update:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Update not found.")
+    db.delete(update)
+    db.commit()
+    return {"message": "Update deleted successfully."}
