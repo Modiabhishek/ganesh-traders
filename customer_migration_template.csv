@@ -1,0 +1,9 @@
+Customer Name,Mobile,Address,Customer Type,Payment Type,Opening Balance,Credit Limit,Notes
+Ramesh Kumar,9876543210,123 Main St,Retail,Monthly Credit,7500,15000,Regular customer
+Ramesh Kumar,9876543210,123 Main Street,Retail,Monthly Credit,0,15000,Duplicate by phone and name
+Suresh Sharma,9823456789,456 Park Rd,Wholesale,Monthly Credit,12000,50000,Main wholesale buyer
+Suresh Sharma,9823456789,456 Park Road,Wholesale,Monthly Credit,2000,50000,Duplicate phone and similar name
+Mahesh Singh,9812345678,789 Lake View,Retail,Cash,0,0,Paid immediately
+Amit Patel,9898989898,12 Ring Road,Retail,Monthly Credit,4500,10000,
+Anil Gupta,,Near Station Road,Wholesale,Monthly Credit,10000,30000,No phone number
+Vijay Verma,9876543210,Market Area,Retail,Monthly Credit,1500,5000,Duplicate phone number (shared with Ramesh)

@@ -1,0 +1,170 @@
+import axios from 'axios';
+
+const isCapacitor = (window.location.hostname === 'localhost' && !window.location.port) || 
+                    window.location.protocol === 'capacitor:' || 
+                    window.location.hostname === 'capacitor';
+
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (isCapacitor) {
+    const savedIP = localStorage.getItem('server_ip') || '192.168.1.15';
+    return `http://${savedIP}:8000/api`;
+  }
+  return `http://${window.location.hostname}:8000/api`;
+};
+
+const api = axios.create({
+  baseURL: getApiUrl(),
+});
+
+// Automatically inject JWT Token and update baseURL dynamically if changed
+api.interceptors.request.use((config) => {
+  config.baseURL = getApiUrl();
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+export const authAPI = {
+  login: async (username, password) => {
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', password);
+    const response = await api.post('/auth/login', formData);
+    return response.data; // returns { access_token, token_type }
+  },
+  register: async (username, password, role = 'Staff') => {
+    const response = await api.post('/auth/register', { username, password, role });
+    return response.data;
+  },
+  getUsers: async () => {
+    const response = await api.get('/auth/users');
+    return response.data;
+  },
+  deleteUser: async (id) => {
+    const response = await api.delete(`/auth/users/${id}`);
+    return response.data;
+  }
+};
+
+export const customerAPI = {
+  getCustomers: async (search = '', type = '', payment = '') => {
+    const params = {};
+    if (search) params.search = search;
+    if (type) params.customer_type = type;
+    if (payment) params.payment_type = payment;
+    const response = await api.get('/customers/', { params });
+    return response.data;
+  },
+  createCustomer: async (customerData) => {
+    const response = await api.post('/customers/', customerData);
+    return response.data;
+  },
+  getCustomer: async (id) => {
+    const response = await api.get(`/customers/${id}`);
+    return response.data;
+  },
+  updateCustomer: async (id, customerData) => {
+    const response = await api.put(`/customers/${id}`, customerData);
+    return response.data;
+  },
+  importPreview: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/customers/import-preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+  importConfirm: async (rows) => {
+    const response = await api.post('/customers/import-confirm', rows);
+    return response.data;
+  },
+  getLedger: async (id) => {
+    const response = await api.get(`/customers/${id}/ledger`);
+    return response.data;
+  }
+};
+
+export const productAPI = {
+  getCategories: async () => {
+    const response = await api.get('/products/categories');
+    return response.data;
+  },
+  createCategory: async (name) => {
+    const response = await api.post('/products/categories', { name });
+    return response.data;
+  },
+  getProducts: async (search = '', categoryId = '') => {
+    const params = {};
+    if (search) params.search = search;
+    if (categoryId) params.category_id = categoryId;
+    const response = await api.get('/products/', { params });
+    return response.data;
+  },
+  createProduct: async (productData) => {
+    const response = await api.post('/products/', productData);
+    return response.data;
+  },
+  updateProduct: async (id, productData) => {
+    const response = await api.put(`/products/${id}`, productData);
+    return response.data;
+  },
+  deleteProduct: async (id) => {
+    const response = await api.delete(`/products/${id}`);
+    return response.data;
+  }
+};
+
+export const transactionAPI = {
+  createSale: async (saleData) => {
+    const response = await api.post('/transactions/sales', saleData);
+    return response.data;
+  },
+  receivePayment: async (paymentData) => {
+    const response = await api.post('/transactions/payments', paymentData);
+    return response.data;
+  },
+  getSales: async (customerId = '') => {
+    const params = {};
+    if (customerId) params.customer_id = customerId;
+    const response = await api.get('/transactions/sales', { params });
+    return response.data;
+  },
+  getPayments: async (customerId = '') => {
+    const params = {};
+    if (customerId) params.customer_id = customerId;
+    const response = await api.get('/transactions/payments', { params });
+    return response.data;
+  },
+  cancelSale: async (id, reason = '') => {
+    const response = await api.post(`/transactions/sales/${id}/cancel`, null, {
+      params: { cancelled_reason: reason }
+    });
+    return response.data;
+  },
+  cancelPayment: async (id) => {
+    const response = await api.post(`/transactions/payments/${id}/cancel`);
+    return response.data;
+  },
+  createExpense: async (expenseData) => {
+    const response = await api.post('/transactions/expenses', expenseData);
+    return response.data;
+  },
+  getExpenses: async () => {
+    const response = await api.get('/transactions/expenses');
+    return response.data;
+  },
+  deleteExpense: async (id) => {
+    const response = await api.delete(`/transactions/expenses/${id}`);
+    return response.data;
+  }
+};
+
+export default api;
