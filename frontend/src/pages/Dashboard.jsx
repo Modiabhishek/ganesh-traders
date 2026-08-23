@@ -6,12 +6,18 @@ const parseNaiveDate = (dateStr) => {
   if (!dateStr) return new Date();
   if (dateStr instanceof Date) return dateStr;
   try {
+    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
+    let workingStr = dateStr;
+    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+      workingStr = dateStr + 'Z';
+    }
+
     // If it has a timezone offset, let the browser parse it natively to handle local timezone conversion.
-    if (dateStr.includes('Z') || dateStr.includes('+') || (dateStr.includes('-') && dateStr.split('-').length > 3)) {
-      return new Date(dateStr);
+    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
+      return new Date(workingStr);
     }
     // Otherwise, parse it as a local naive date.
-    const parts = dateStr.replace('T', ' ').split(' ');
+    const parts = workingStr.replace('T', ' ').split(' ');
     const dateParts = parts[0].split('-');
     const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
     return new Date(
@@ -36,11 +42,13 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
   });
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
+        setError(null);
         // Load customers to calculate outstanding
         const customers = await customerAPI.getCustomers();
         
@@ -93,6 +101,7 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
         });
       } catch (err) {
         console.error("Error loading dashboard data:", err);
+        setError(err.message || "Failed to load dashboard statistics from backend.");
       } finally {
         setLoading(false);
       }
@@ -100,8 +109,22 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
     loadDashboardData();
   }, []);
 
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', minHeight: '50vh', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading dashboard statistics...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="layout-container" style={{ animation: 'fadeIn 0.3s ease' }}>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem' }}>
+          <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Connection/Server Error:</p>
+          <p style={{ fontSize: '0.9rem' }}>{error}</p>
+        </div>
+      )}
       <header className="flex-between" style={{ marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
