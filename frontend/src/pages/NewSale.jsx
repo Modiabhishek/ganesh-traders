@@ -246,8 +246,6 @@ const NewSale = ({ setCurrentPage, goBack }) => {
         </button>
       </section>
 
-      </section>
-
       {/* QUICK MODE TAB VIEW */}
       {saleMode === 'quick' && (
         <form onSubmit={handleSaveQuickSale} className="glass-panel" style={{ maxWidth: '480px', margin: '0 auto', padding: '2rem' }}>
