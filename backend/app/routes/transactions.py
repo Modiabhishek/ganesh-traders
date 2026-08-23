@@ -10,9 +10,12 @@ class datetime(dt):
 from ..database import get_db
 from ..models.customer import Customer
 from ..models.product import Product
-from ..models.transaction import Sale, SaleItem, CustomerPayment, Expense
+from ..models.transaction import Sale, SaleItem, CustomerPayment, Expense, CerealTransaction
 from ..models.inventory import StockMovement
-from ..schemas.transaction import SaleCreate, SaleResponse, CustomerPaymentCreate, CustomerPaymentResponse, ExpenseCreate, ExpenseResponse
+from ..schemas.transaction import (
+    SaleCreate, SaleResponse, CustomerPaymentCreate, CustomerPaymentResponse, 
+    ExpenseCreate, ExpenseResponse, CerealTransactionCreate, CerealTransactionResponse
+)
 from ..dependencies.auth import get_current_user
 from ..models.user import User
 
@@ -280,3 +283,88 @@ def delete_expense(
     db.delete(exp)
     db.commit()
     return {"message": "Expense record deleted successfully."}
+
+@router.post("/cereals", response_model=CerealTransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_cereal_transaction(
+    tx_in: CerealTransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    product = db.query(Product).filter(Product.id == tx_in.product_id, Product.status == "Active").first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product/crop not found.")
+
+    # Calculate total valuation amount
+    total_amount = Decimal(str(tx_in.weight)) * Decimal(str(tx_in.rate))
+
+    # Adjust product current_stock
+    # Allowed units: kg and quintal (1 quintal = 100 kg)
+    tx_weight = Decimal(str(tx_in.weight))
+    
+    # Standardize weight to product's unit for current_stock update
+    weight_adjusted = tx_weight
+    if tx_in.unit == "kg" and product.unit == "quintal":
+        weight_adjusted = tx_weight / Decimal("100")
+    elif tx_in.unit == "quintal" and product.unit == "kg":
+        weight_adjusted = tx_weight * Decimal("100")
+
+    if tx_in.transaction_type == "BUY":
+        # Buying increases stock
+        product.current_stock += weight_adjusted
+        # Update buying rate (purchase_price)
+        rate_adjusted = Decimal(str(tx_in.rate))
+        if tx_in.unit == "kg" and product.unit == "quintal":
+            rate_adjusted = Decimal(str(tx_in.rate)) * Decimal("100")
+        elif tx_in.unit == "quintal" and product.unit == "kg":
+            rate_adjusted = Decimal(str(tx_in.rate)) / Decimal("100")
+        product.purchase_price = rate_adjusted
+    else:
+        # Selling decreases stock
+        product.current_stock -= weight_adjusted
+        # Update selling rate (selling_price)
+        rate_adjusted = Decimal(str(tx_in.rate))
+        if tx_in.unit == "kg" and product.unit == "quintal":
+            rate_adjusted = Decimal(str(tx_in.rate)) * Decimal("100")
+        elif tx_in.unit == "quintal" and product.unit == "kg":
+            rate_adjusted = Decimal(str(tx_in.rate)) / Decimal("100")
+        product.selling_price = rate_adjusted
+
+    # Record Cereal Transaction
+    new_tx = CerealTransaction(
+        product_id=tx_in.product_id,
+        transaction_type=tx_in.transaction_type,
+        weight=tx_in.weight,
+        unit=tx_in.unit,
+        rate=tx_in.rate,
+        total_amount=total_amount,
+        bags=tx_in.bags,
+        notes=tx_in.notes
+    )
+    db.add(new_tx)
+
+    # Also log in StockMovement for audit logs!
+    movement_type = "PURCHASE" if tx_in.transaction_type == "BUY" else "SALE"
+    notes_movement = f"{tx_in.transaction_type} crop: {tx_weight} {tx_in.unit} @ ₹{tx_in.rate}"
+    if tx_in.bags:
+        notes_movement += f" ({tx_in.bags} Kattas/Bags)"
+    if tx_in.notes:
+        notes_movement += f" | Note: {tx_in.notes}"
+        
+    db.add(StockMovement(
+        product_id=tx_in.product_id,
+        movement_type=movement_type,
+        quantity=weight_adjusted if tx_in.transaction_type == "BUY" else -weight_adjusted,
+        reference_type="CerealTransaction",
+        notes=notes_movement
+    ))
+
+    db.commit()
+    db.refresh(new_tx)
+    return new_tx
+
+@router.get("/cereals", response_model=List[CerealTransactionResponse])
+def get_cereal_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(CerealTransaction).order_by(CerealTransaction.created_at.desc()).all()

@@ -182,4 +182,15 @@ export const transactionAPI = {
   }
 };
 
+export const cerealAPI = {
+  createTransaction: async (txData) => {
+    const response = await api.post('/transactions/cereals', txData);
+    return response.data;
+  },
+  getTransactions: async () => {
+    const response = await api.get('/transactions/cereals');
+    return response.data;
+  }
+};
+
 export default api;

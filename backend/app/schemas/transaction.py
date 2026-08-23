@@ -155,3 +155,27 @@ class ExpenseResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CerealTransactionCreate(BaseModel):
+    product_id: int
+    transaction_type: str = Field(..., pattern="^(BUY|SELL)$")
+    weight: Decimal = Field(..., gt=0)
+    unit: str = Field("quintal", pattern="^(quintal|kg)$")
+    rate: Decimal = Field(..., gt=0)
+    bags: Optional[int] = None
+    notes: Optional[str] = None
+
+class CerealTransactionResponse(BaseModel):
+    id: int
+    product_id: int
+    transaction_type: str
+    weight: Decimal
+    unit: str
+    rate: Decimal
+    total_amount: Decimal
+    bags: Optional[int]
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

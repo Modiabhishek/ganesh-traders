@@ -111,3 +111,19 @@ class Expense(Base):
     description = Column(Text, nullable=True)
     attachment_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class CerealTransaction(Base):
+    __tablename__ = "cereal_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    transaction_type = Column(String, nullable=False)  # "BUY" or "SELL"
+    weight = Column(Numeric(12, 2), default=0.00, nullable=False)
+    unit = Column(String, default="quintal", nullable=False)  # "quintal", "kg"
+    rate = Column(Numeric(12, 2), default=0.00, nullable=False)
+    total_amount = Column(Numeric(12, 2), default=0.00, nullable=False)
+    bags = Column(Integer, nullable=True)  # optional katta count
+    notes = Column(Text, nullable=True)  # optional remarks
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    product = relationship("Product")
