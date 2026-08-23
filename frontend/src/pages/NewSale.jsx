@@ -246,87 +246,7 @@ const NewSale = ({ setCurrentPage, goBack }) => {
         </button>
       </section>
 
-      {/* Customer Selection Block */}
-      <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Select Customer (ग्राहक)</h2>
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="Type to search credit customer... (e.g. Ramesh)"
-                style={{ paddingLeft: '2.5rem' }}
-                value={customerSearch}
-                onChange={e => {
-                  setCustomerSearch(e.target.value);
-                  setShowCustDropdown(true);
-                }}
-                onFocus={() => setShowCustDropdown(true)}
-              />
-            </div>
-            <button 
-              type="button" 
-              className={`btn ${!selectedCustomer ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => {
-                setSelectedCustomer(null);
-                setCustomerSearch('');
-                setPaymentMethod('Cash');
-              }}
-            >
-              {!selectedCustomer ? <Check size={16} /> : null} Walk-in Customer
-            </button>
-          </div>
-
-          {showCustDropdown && customerSearch && (
-            <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: '0.25rem', padding: '0.5rem', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color)' }}>
-              {customers.length === 0 ? (
-                <p style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No customer found.</p>
-              ) : (
-                customers.map(c => (
-                  <div 
-                    key={c.id} 
-                    style={{ padding: '0.625rem 0.875rem', cursor: 'pointer', borderRadius: 'var(--radius-sm)' }}
-                    className="hover-card"
-                    onClick={() => {
-                      setSelectedCustomer(c);
-                      setCustomerSearch(c.name);
-                      setShowCustDropdown(false);
-                      if (c.payment_type === 'Monthly Credit') {
-                        setPaymentMethod('Credit');
-                      } else {
-                        setPaymentMethod('Cash');
-                      }
-                    }}
-                  >
-                    <strong style={{ fontSize: '0.95rem' }}>{c.name}</strong> ({c.customer_code}) 
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>- Mobile: {c.mobile || 'N/A'}</span>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                      Outstanding: ₹{parseFloat(c.current_balance).toFixed(2)} | Terms: {c.payment_type}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-        {selectedCustomer && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h4 style={{ fontWeight: 600 }}>Selected: {selectedCustomer.name}</h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Code: {selectedCustomer.customer_code} | Mobile: {selectedCustomer.mobile || 'N/A'} | Terms: {selectedCustomer.payment_type}
-              </p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Outstanding Due</span>
-              <p style={{ fontWeight: 700, color: 'var(--danger-text)', fontSize: '1.1rem' }}>₹{parseFloat(selectedCustomer.current_balance).toFixed(2)}</p>
-            </div>
-          </div>
-        )}
-      </div>
+      </section>
 
       {/* QUICK MODE TAB VIEW */}
       {saleMode === 'quick' && (
@@ -361,14 +281,97 @@ const NewSale = ({ setCurrentPage, goBack }) => {
             className="btn btn-primary" 
             style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', background: 'var(--success)' }}
           >
-            Confirm Cash Sale
+            Confirm Cash Sale (Walk-in)
           </button>
         </form>
       )}
 
       {/* DETAILED MODE TAB VIEW */}
       {saleMode === 'detailed' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+        <div>
+          {/* Customer Selection Block */}
+          <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Select Customer (ग्राहक)</h2>
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    placeholder="Type to search credit customer... (e.g. Ramesh)"
+                    style={{ paddingLeft: '2.5rem' }}
+                    value={customerSearch}
+                    onChange={e => {
+                      setCustomerSearch(e.target.value);
+                      setShowCustDropdown(true);
+                    }}
+                    onFocus={() => setShowCustDropdown(true)}
+                  />
+                </div>
+                <button 
+                  type="button" 
+                  className={`btn ${!selectedCustomer ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setCustomerSearch('');
+                    setPaymentMethod('Cash');
+                  }}
+                >
+                  {!selectedCustomer ? <Check size={16} /> : null} Walk-in Customer
+                </button>
+              </div>
+
+              {showCustDropdown && customerSearch && (
+                <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: '0.25rem', padding: '0.5rem', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color)' }}>
+                  {customers.length === 0 ? (
+                    <p style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No customer found.</p>
+                  ) : (
+                    customers.map(c => (
+                      <div 
+                        key={c.id} 
+                        style={{ padding: '0.625rem 0.875rem', cursor: 'pointer', borderRadius: 'var(--radius-sm)' }}
+                        className="hover-card"
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setCustomerSearch(c.name);
+                          setShowCustDropdown(false);
+                          if (c.payment_type === 'Monthly Credit') {
+                            setPaymentMethod('Credit');
+                          } else {
+                            setPaymentMethod('Cash');
+                          }
+                        }}
+                      >
+                        <strong style={{ fontSize: '0.95rem' }}>{c.name}</strong> ({c.customer_code}) 
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>- Mobile: {c.mobile || 'N/A'}</span>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                          Outstanding: ₹{parseFloat(c.current_balance).toFixed(2)} | Terms: {c.payment_type}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedCustomer && (
+              <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ fontWeight: 600 }}>Selected: {selectedCustomer.name}</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Code: {selectedCustomer.customer_code} | Mobile: {selectedCustomer.mobile || 'N/A'} | Terms: {selectedCustomer.payment_type}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Outstanding Due</span>
+                  <p style={{ fontWeight: 700, color: 'var(--danger-text)', fontSize: '1.1rem' }}>₹{parseFloat(selectedCustomer.current_balance).toFixed(2)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
           
           {/* Detailed Picker and Cart */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
