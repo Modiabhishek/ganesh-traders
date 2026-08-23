@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { customerAPI, transactionAPI } from '../services/api';
-import { Search, Plus, CreditCard, ClipboardList, PhoneCall, MapPin, X, MessageCircle, Printer } from 'lucide-react';
+import { Search, Plus, CreditCard, ClipboardList, PhoneCall, MapPin, X, MessageCircle, Printer, Trash2 } from 'lucide-react';
 
 const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
   const [customers, setCustomers] = useState([]);
@@ -119,6 +119,25 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
     } catch (err) {
       console.error(err);
       setMessage({ text: 'Failed to save payment.', type: 'danger' });
+    }
+  };
+
+  const handleDeleteCustomer = async (customer) => {
+    const isDue = (parseFloat(customer.current_balance) || 0) > 0;
+    const confirmMessage = isDue 
+      ? `WARNING: Customer "${customer.name}" has an outstanding balance of ₹${parseFloat(customer.current_balance).toFixed(2)}.\n\nAre you sure you want to delete this customer? This will hide them from the directory.`
+      : `Are you sure you want to delete customer "${customer.name}"?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await customerAPI.deleteCustomer(customer.id);
+      setMessage({ text: `Customer "${customer.name}" deleted successfully.`, type: 'success' });
+      loadCustomers();
+    } catch (err) {
+      console.error(err);
+      const detail = err.response?.data?.detail || 'Failed to delete customer.';
+      setMessage({ text: detail, type: 'danger' });
     }
   };
 
@@ -310,6 +329,15 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
                         }}
                       >
                         <ClipboardList size={14} /> Ledger
+                      </button>
+                      
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fee2e2' }}
+                        onClick={() => handleDeleteCustomer(c)}
+                        title="Delete Customer"
+                      >
+                        <Trash2 size={14} /> Delete
                       </button>
                     </div>
                   </td>

@@ -85,6 +85,10 @@ export const customerAPI = {
     const response = await api.put(`/customers/${id}`, customerData);
     return response.data;
   },
+  deleteCustomer: async (id) => {
+    const response = await api.delete(`/customers/${id}`);
+    return response.data;
+  },
   importPreview: async (file) => {
     const formData = new FormData();
     formData.append('file', file);

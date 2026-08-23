@@ -235,3 +235,18 @@ def get_customer_ledger(
         },
         "ledger": transactions
     }
+
+@router.delete("/{customer_id}", status_code=status.HTTP_200_OK)
+def delete_customer(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cust = db.query(Customer).filter(Customer.id == customer_id, Customer.status == "Active").first()
+    if not cust:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    
+    # Soft delete: set status to Inactive
+    cust.status = "Inactive"
+    db.commit()
+    return {"message": "Customer deleted successfully."}
