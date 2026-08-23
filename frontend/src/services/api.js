@@ -31,6 +31,17 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+// Automatically logout user on 401 Unauthorized responses (e.g. deleted/deactivated)
+api.interceptors.response.use((response) => {
+  return response;
+}, (error) => {
+  if (error.response && error.response.status === 401) {
+    localStorage.removeItem('token');
+    window.location.reload();
+  }
+  return Promise.reject(error);
+});
+
 export const authAPI = {
   login: async (username, password) => {
     const formData = new FormData();
