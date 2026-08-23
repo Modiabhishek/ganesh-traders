@@ -4,8 +4,14 @@ import { PlusCircle, ArrowUpRight, DollarSign, Users, AlertTriangle, FileText, U
 
 const parseNaiveDate = (dateStr) => {
   if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
   try {
-    const parts = dateStr.split('T');
+    // If it has a timezone offset, let the browser parse it natively to handle local timezone conversion.
+    if (dateStr.includes('Z') || dateStr.includes('+') || (dateStr.includes('-') && dateStr.split('-').length > 3)) {
+      return new Date(dateStr);
+    }
+    // Otherwise, parse it as a local naive date.
+    const parts = dateStr.replace('T', ' ').split(' ');
     const dateParts = parts[0].split('-');
     const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
     return new Date(
@@ -41,8 +47,9 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
         let outstanding = 0;
         let overdue = 0;
         customers.forEach(c => {
-          outstanding += parseFloat(c.current_balance);
-          if (c.payment_type === 'Monthly Credit' && parseFloat(c.current_balance) > 0) {
+          const bal = parseFloat(c.current_balance) || 0;
+          outstanding += bal;
+          if (c.payment_type === 'Monthly Credit' && bal > 0) {
             overdue += 1; // Simplistic rule: credit customer with balance
           }
         });
@@ -51,7 +58,7 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
         const products = await productAPI.getProducts();
         let lowStock = 0;
         products.forEach(p => {
-          if (parseFloat(p.current_stock) <= parseFloat(p.minimum_stock)) {
+          if ((parseFloat(p.current_stock) || 0) <= (parseFloat(p.minimum_stock) || 0)) {
             lowStock += 1;
           }
         });
@@ -66,14 +73,14 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
 
         sales.forEach(s => {
           if (parseNaiveDate(s.sale_date).toDateString() === todayStr) {
-            todaySalesSum += parseFloat(s.total_amount);
-            todayCollectionSum += parseFloat(s.paid_amount);
+            todaySalesSum += parseFloat(s.total_amount) || 0;
+            todayCollectionSum += parseFloat(s.paid_amount) || 0;
           }
         });
 
         payments.forEach(p => {
           if (parseNaiveDate(p.payment_date).toDateString() === todayStr) {
-            todayCollectionSum += parseFloat(p.amount);
+            todayCollectionSum += parseFloat(p.amount) || 0;
           }
         });
 
