@@ -51,7 +51,7 @@ def startup_event():
             db.commit()
 
         # Seed initial product categories
-        default_categories = ["Grocery / Daily Needs", "Pooja Items", "Household", "Personal Care", "Other"]
+        default_categories = ["Grocery / Daily Needs", "Pooja Items", "Household", "Personal Care", "Other", "Cereals & Crops"]
         for name in default_categories:
             exists = db.query(Category).filter(Category.name == name).first()
             if not exists:
@@ -65,7 +65,12 @@ def startup_event():
             {"name": "Mustard Oil (सरसों का तेल)", "category": "Grocery / Daily Needs", "price": 180.00, "unit": "litre", "code": "PROD-00002"},
             {"name": "Incense Sticks (अगरबत्ती)", "category": "Pooja Items", "price": 40.00, "unit": "packet", "code": "PROD-00003"},
             {"name": "Dishwash Bar (साबुन)", "category": "Household", "price": 20.00, "unit": "piece", "code": "PROD-00004"},
-            {"name": "Toothpaste (कोलगेट)", "category": "Personal Care", "price": 65.00, "unit": "piece", "code": "PROD-00005"},
+            {"name": "Toothpaste (कोलげて)", "category": "Personal Care", "price": 65.00, "unit": "piece", "code": "PROD-00005"},
+            {"name": "Wheat (Gehu / गेहूँ)", "category": "Cereals & Crops", "price": 2400.00, "unit": "quintal", "code": "CEREAL-WHEAT"},
+            {"name": "Chana (Bengal Gram / चना)", "category": "Cereals & Crops", "price": 5800.00, "unit": "quintal", "code": "CEREAL-CHANA"},
+            {"name": "Bajra (Pearl Millet / बाजरा)", "category": "Cereals & Crops", "price": 2100.00, "unit": "quintal", "code": "CEREAL-BAJRA"},
+            {"name": "Guar Seed (ग्वार)", "category": "Cereals & Crops", "price": 5200.00, "unit": "quintal", "code": "CEREAL-GUAR"},
+            {"name": "Mustard (Sarsoo / सरसों)", "category": "Cereals & Crops", "price": 5650.00, "unit": "quintal", "code": "CEREAL-MUSTARD"},
         ]
         for p in default_products:
             prod_exists = db.query(Product).filter(Product.product_code == p["code"]).first()
@@ -78,7 +83,7 @@ def startup_event():
                         category_id=cat.id,
                         selling_price=Decimal(str(p["price"])),
                         unit=p["unit"],
-                        current_stock=Decimal("10000.00")
+                        current_stock=Decimal("0.00") if p["code"].startswith("CEREAL") else Decimal("10000.00")
                     ))
         db.commit()
     finally:

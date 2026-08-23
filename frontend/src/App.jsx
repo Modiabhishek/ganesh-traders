@@ -6,10 +6,11 @@ import Ledger from './pages/Ledger';
 import NewSale from './pages/NewSale';
 import CustomerImport from './pages/CustomerImport';
 import ProductCatalog from './pages/ProductCatalog';
+import CerealStock from './pages/CerealStock';
 import TransactionHistory from './pages/TransactionHistory';
 import StaffManager from './pages/StaffManager';
 import ExpenseManager from './pages/ExpenseManager';
-import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown } from 'lucide-react';
+import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout } from 'lucide-react';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -182,6 +183,8 @@ function App() {
         return <CustomerImport setCurrentPage={navigateTo} goBack={goBack} />;
       case 'products':
         return <ProductCatalog setCurrentPage={navigateTo} goBack={goBack} />;
+      case 'cereal-stock':
+        return <CerealStock setCurrentPage={navigateTo} goBack={goBack} />;
       case 'transactions':
         return <TransactionHistory setCurrentPage={navigateTo} goBack={goBack} />;
       case 'expenses':
@@ -234,6 +237,14 @@ function App() {
             onClick={() => navigateTo('products')}
           >
             <ClipboardList size={18} /> Product Catalog
+          </button>
+
+          <button 
+            className={`btn ${currentPage === 'cereal-stock' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ justifyContent: 'flex-start', border: currentPage === 'cereal-stock' ? 'none' : '1px solid transparent' }}
+            onClick={() => navigateTo('cereal-stock')}
+          >
+            <Sprout size={18} style={{ color: '#eab308' }} /> Crop Stock (अनाज)
           </button>
 
           <button 
