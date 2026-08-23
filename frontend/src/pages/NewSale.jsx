@@ -547,7 +547,8 @@ const NewSale = ({ setCurrentPage, goBack }) => {
             </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   );
 };
