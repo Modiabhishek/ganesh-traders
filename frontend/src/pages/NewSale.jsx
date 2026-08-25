@@ -96,6 +96,7 @@ const NewSale = ({ setCurrentPage, goBack }) => {
       setCart([...cart, {
         product_id: prod.id,
         name: prod.name,
+        pack_size: prod.pack_size,
         price: prod.selling_price,
         quantity: 1,
         unit: prod.unit
@@ -404,6 +405,11 @@ const NewSale = ({ setCurrentPage, goBack }) => {
                         >
                           <div>
                             <strong style={{ fontSize: '0.95rem' }}>{p.name}</strong> 
+                            {p.pack_size && (
+                              <span style={{ fontSize: '0.8rem', color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '0.1rem 0.4rem', borderRadius: '4px', marginLeft: '0.5rem', fontWeight: 600 }}>
+                                {p.pack_size}
+                              </span>
+                            )}
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({p.brand || 'No Brand'})</span>
                           </div>
                           <div style={{ textAlign: 'right' }}>
@@ -436,7 +442,14 @@ const NewSale = ({ setCurrentPage, goBack }) => {
                   ) : (
                     cart.map(item => (
                       <tr key={item.product_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.75rem 0', fontWeight: 500 }}>{item.name}</td>
+                        <td style={{ padding: '0.75rem 0', fontWeight: 500 }}>
+                          {item.name}
+                          {item.pack_size && (
+                            <span style={{ fontSize: '0.75rem', color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '0.05rem 0.25rem', borderRadius: '3px', marginLeft: '0.4rem', fontWeight: 600 }}>
+                              {item.pack_size}
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '0.75rem 0' }}>
                           <input 
                             type="number" 
