@@ -2,6 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import { Users, UserPlus, Trash2, ArrowLeft, Loader, Key, ShieldCheck } from 'lucide-react';
 
+const decodeToken = (token) => {
+  if (!token) return null;
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
 const StaffManager = ({ setCurrentPage, goBack }) => {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +117,17 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
         password: editPassword || null,
         role: editRole
       });
+      const token = localStorage.getItem('token');
+      const payload = decodeToken(token);
+      const isSelf = payload && payload.sub.toLowerCase() === editingStaff.username.toLowerCase();
+
+      if (isSelf) {
+        alert("Your credentials have been successfully updated. You will now be logged out. Please sign in with your new username and password.");
+        localStorage.removeItem('token');
+        window.location.reload();
+        return;
+      }
+
       setMessage({ text: `Staff account updated successfully!`, type: 'success' });
       setShowEditModal(false);
       setEditingStaff(null);
