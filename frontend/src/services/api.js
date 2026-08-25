@@ -12,7 +12,7 @@ const getApiUrl = () => {
     const savedIP = localStorage.getItem('server_ip') || '192.168.1.15';
     return `http://${savedIP}:8000/api`;
   }
-  if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('vercel.app')) {
+  if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('vercel.app') || window.location.hostname.includes('modi.app')) {
     return 'https://ganesh-traders-backend.onrender.com/api';
   }
   return `http://${window.location.hostname}:8000/api`;
