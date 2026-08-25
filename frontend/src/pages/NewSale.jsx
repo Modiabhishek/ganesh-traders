@@ -20,6 +20,13 @@ const NewSale = ({ setCurrentPage, goBack }) => {
   const [productSearch, setProductSearch] = useState('');
   const [showProdDropdown, setShowProdDropdown] = useState(false);
   const [cart, setCart] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [showAddProdModal, setShowAddProdModal] = useState(false);
+  const [newProdName, setNewProdName] = useState('');
+  const [newProdPack, setNewProdPack] = useState('');
+  const [newProdPrice, setNewProdPrice] = useState('');
+  const [newProdCat, setNewProdCat] = useState('');
+  const [newProdUnit, setNewProdUnit] = useState('piece');
   const [discount, setDiscount] = useState('0.00');
   const [paidAmount, setPaidAmount] = useState('0.00');
 
@@ -40,7 +47,19 @@ const NewSale = ({ setCurrentPage, goBack }) => {
         console.error("Error loading general product details:", err);
       }
     };
+    const fetchCategories = async () => {
+      try {
+        const cats = await productAPI.getCategories();
+        setCategories(cats || []);
+        if (cats && cats.length > 0) {
+          setNewProdCat(cats[0].id.toString());
+        }
+      } catch (err) {
+        console.error("Error loading categories:", err);
+      }
+    };
     fetchGeneralProduct();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -104,6 +123,44 @@ const NewSale = ({ setCurrentPage, goBack }) => {
     }
     setProductSearch('');
     setShowProdDropdown(false);
+  };
+
+  const handleQuickAddProduct = async (e) => {
+    e.preventDefault();
+    if (!newProdName.trim() || !newProdPrice.trim() || !newProdCat) {
+      alert("Please enter Name, Price, and Category.");
+      return;
+    }
+    const priceVal = parseFloat(newProdPrice);
+    if (isNaN(priceVal) || priceVal < 0) {
+      alert("Please enter a valid price.");
+      return;
+    }
+
+    try {
+      const randCode = "PROD-" + Math.floor(100000 + Math.random() * 900000);
+      const created = await productAPI.createProduct({
+        name: newProdName.trim(),
+        pack_size: newProdPack.trim() || null,
+        selling_price: priceVal,
+        category_id: parseInt(newProdCat),
+        unit: newProdUnit,
+        product_code: randCode,
+        current_stock: 10000
+      });
+
+      // Add to cart directly
+      handleAddProductToCart(created);
+      
+      // Reset & close
+      setNewProdName('');
+      setNewProdPack('');
+      setNewProdPrice('');
+      setShowAddProdModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create product variant. Please ensure data is correct.");
+    }
   };
 
   const handleUpdateQuantity = (prodId, val) => {
@@ -375,7 +432,20 @@ const NewSale = ({ setCurrentPage, goBack }) => {
           {/* Detailed Picker and Cart */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="glass-panel">
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem' }}>Add Product Items</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Add Product Items</h2>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm"
+                  style={{ color: 'var(--primary)', borderColor: 'var(--primary)', padding: '0.4rem 0.75rem', fontWeight: 600 }}
+                  onClick={() => {
+                    setNewProdName(productSearch);
+                    setShowAddProdModal(true);
+                  }}
+                >
+                  + Quick Add Product (नया पैक साइज)
+                </button>
+              </div>
               <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
                 <input 
@@ -562,6 +632,93 @@ const NewSale = ({ setCurrentPage, goBack }) => {
         </div>
       </div>
     )}
+
+      {/* Quick Add Product Modal */}
+      {showAddProdModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '440px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Quick Add Product Variant</h2>
+              <button 
+                type="button" 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-secondary)' }}
+                onClick={() => setShowAddProdModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickAddProduct}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Product Name *</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  required 
+                  placeholder="e.g. Mustard Oil or Sugar"
+                  value={newProdName} 
+                  onChange={e => setNewProdName(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Packing Size / Weight (Optional)</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. 100gm, 500gm, 1 Litre"
+                  value={newProdPack} 
+                  onChange={e => setNewProdPack(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Selling Price (₹) *</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input-field" 
+                  required 
+                  placeholder="e.g. 45"
+                  value={newProdPrice} 
+                  onChange={e => setNewProdPrice(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Category *</label>
+                <select 
+                  className="input-field" 
+                  required 
+                  value={newProdCat} 
+                  onChange={e => setNewProdCat(e.target.value)}
+                >
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Weight Unit</label>
+                <select className="input-field" value={newProdUnit} onChange={e => setNewProdUnit(e.target.value)}>
+                  <option value="piece">piece (नग)</option>
+                  <option value="kg">kg (किलोग्राम)</option>
+                  <option value="litre">litre (लीटर)</option>
+                  <option value="packet">packet (पैकेट)</option>
+                  <option value="gram">gram (ग्राम)</option>
+                  <option value="ml">ml (मिश्री)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddProdModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Create & Add to Bill</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
