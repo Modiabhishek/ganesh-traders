@@ -184,6 +184,10 @@ export const transactionAPI = {
     const response = await api.post(`/transactions/payments/${id}/cancel`);
     return response.data;
   },
+  updatePayment: async (id, paymentData) => {
+    const response = await api.put(`/transactions/payments/${id}`, paymentData);
+    return response.data;
+  },
   createExpense: async (expenseData) => {
     const response = await api.post('/transactions/expenses', expenseData);
     return response.data;
@@ -194,6 +198,10 @@ export const transactionAPI = {
   },
   deleteExpense: async (id) => {
     const response = await api.delete(`/transactions/expenses/${id}`);
+    return response.data;
+  },
+  updateExpense: async (id, expenseData) => {
+    const response = await api.put(`/transactions/expenses/${id}`, expenseData);
     return response.data;
   }
 };

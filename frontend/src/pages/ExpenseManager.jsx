@@ -48,6 +48,15 @@ const ExpenseManager = ({ setCurrentPage, goBack }) => {
 
   const [message, setMessage] = useState({ text: '', type: '' });
 
+  // Edit Expense states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editMethod, setEditMethod] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editDate, setEditDate] = useState('');
+
   const loadExpenses = async () => {
     setLoading(true);
     try {
@@ -110,6 +119,33 @@ const ExpenseManager = ({ setCurrentPage, goBack }) => {
     } catch (err) {
       console.error(err);
       setMessage({ text: 'Failed to delete expense record.', type: 'danger' });
+    }
+  };
+
+  const handleUpdateExpense = async (e) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+    const amountVal = parseFloat(editAmount);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Please enter a valid amount greater than zero.");
+      return;
+    }
+
+    try {
+      await transactionAPI.updateExpense(editingExpense.id, {
+        category: editCategory,
+        amount: amountVal,
+        payment_method: editMethod,
+        description: editDesc || null,
+        date: editDate ? `${editDate}T12:00:00` : null
+      });
+      setMessage({ text: 'Expense record updated successfully.', type: 'success' });
+      setShowEditModal(false);
+      setEditingExpense(null);
+      loadExpenses();
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to update expense record.', type: 'danger' });
     }
   };
 
@@ -273,20 +309,119 @@ const ExpenseManager = ({ setCurrentPage, goBack }) => {
                   <td style={{ padding: '1rem' }}>{exp.payment_method}</td>
                   <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{exp.description || '-'}</td>
                   <td style={{ padding: '1rem', textAlign: 'center' }} className="no-print">
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '0.4rem', color: 'var(--danger)' }}
-                      title="Delete expense record"
-                      onClick={() => handleDeleteExpense(exp)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.4rem 0.65rem' }}
+                        title="Edit expense details"
+                        onClick={() => {
+                          setEditingExpense(exp);
+                          setEditCategory(exp.category);
+                          setEditAmount(parseFloat(exp.amount).toString());
+                          setEditMethod(exp.payment_method);
+                          setEditDesc(exp.description || '');
+                          setEditDate(exp.date ? exp.date.split('T')[0] : '');
+                          setShowEditModal(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.4rem', color: 'var(--danger)' }}
+                        title="Delete expense record"
+                        onClick={() => handleDeleteExpense(exp)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
+      )}
+
+      {/* Edit Expense Modal */}
+      {showEditModal && editingExpense && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '440px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Expense Record</h2>
+              <button 
+                type="button" 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-secondary)' }}
+                onClick={() => { setShowEditModal(false); setEditingExpense(null); }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateExpense}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Expense Category *</label>
+                <select className="input-field" required value={editCategory} onChange={e => setEditCategory(e.target.value)}>
+                  <option value="Electricity (बिजली बिल)">Electricity (बिजली बिल)</option>
+                  <option value="Water (पानी बिल)">Water (पानी बिल)</option>
+                  <option value="Shop Rent (दुकान का किराया)">Shop Rent (दुकान का किराया)</option>
+                  <option value="Staff Salaries (कर्मचारियों का वेतन)">Staff Salaries (कर्मचारियों का वेतन)</option>
+                  <option value="Transportation (परिवहन / भाड़ा)">Transportation (परिवहन / भाड़ा)</option>
+                  <option value="Cereals Buying Cash (अनाज नकद खरीद)">Cereals Buying Cash (अनाज नकद खरीद)</option>
+                  <option value="Office Supplies (कार्यालय सामग्री)">Office Supplies (कार्यालय सामग्री)</option>
+                  <option value="Other Business Expense (अन्य खर्च)">Other Business Expense (अन्य खर्च)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Amount Spent (₹) *</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input-field" 
+                  required 
+                  value={editAmount} 
+                  onChange={e => setEditAmount(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Payment Mode</label>
+                <select className="input-field" value={editMethod} onChange={e => setEditMethod(e.target.value)}>
+                  <option value="Cash">Cash (नकद)</option>
+                  <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                  <option value="Bank">Bank Transfer</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Description / Remarks</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editDesc} 
+                  onChange={e => setEditDesc(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Expense Date</label>
+                <input 
+                  type="date" 
+                  className="input-field" 
+                  value={editDate} 
+                  onChange={e => setEditDate(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditModal(false); setEditingExpense(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Global CSS styles for Print */}

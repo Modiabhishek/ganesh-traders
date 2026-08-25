@@ -250,6 +250,39 @@ def cancel_payment(
     db.commit()
     return {"message": f"Payment {payment.payment_number} cancelled and reversed successfully."}
 
+@router.put("/payments/{payment_id}", response_model=CustomerPaymentResponse)
+def update_payment(
+    payment_id: int,
+    payment_in: CustomerPaymentCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    payment = db.query(CustomerPayment).filter(CustomerPayment.id == payment_id, CustomerPayment.status == "Active").first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment transaction not found.")
+
+    customer = db.query(Customer).filter(Customer.id == payment.customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+
+    # Reverse old payment impact
+    customer.current_balance += payment.amount
+    # Apply new payment impact
+    customer.current_balance -= payment_in.amount
+
+    # Update payment details
+    payment.amount = payment_in.amount
+    payment.payment_method = payment_in.payment_method
+    payment.reference_number = payment_in.reference_number
+    payment.notes = payment_in.notes
+
+    db.commit()
+    db.refresh(payment)
+    return payment
+
 @router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 def create_expense(
     expense_in: ExpenseCreate,
@@ -287,6 +320,31 @@ def delete_expense(
     db.delete(exp)
     db.commit()
     return {"message": "Expense record deleted successfully."}
+
+@router.put("/expenses/{expense_id}", response_model=ExpenseResponse)
+def update_expense(
+    expense_id: int,
+    expense_in: ExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    exp = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not exp:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense record not found.")
+
+    exp.category = expense_in.category
+    exp.amount = expense_in.amount
+    exp.payment_method = expense_in.payment_method
+    exp.description = expense_in.description
+    if expense_in.date:
+        exp.date = expense_in.date
+
+    db.commit()
+    db.refresh(exp)
+    return exp
 
 @router.post("/cereals", response_model=CerealTransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_cereal_transaction(

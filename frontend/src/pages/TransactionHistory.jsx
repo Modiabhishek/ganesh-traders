@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { transactionAPI } from '../services/api';
-import { Search, Printer, Trash2, ArrowLeft, Loader, Calendar, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Printer, Trash2, ArrowLeft, Loader, Calendar, FileText, CheckCircle, XCircle, X } from 'lucide-react';
 
 const parseNaiveDate = (dateStr) => {
   if (!dateStr) return new Date();
@@ -42,6 +42,14 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
   // Reprint modal state
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [message, setMessage] = useState({ text: '', type: '' });
+
+  // Payment edit modal state
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState('');
+  const [editPaymentMethod, setEditPaymentMethod] = useState('Cash');
+  const [editPaymentRef, setEditPaymentRef] = useState('');
+  const [editPaymentNotes, setEditPaymentNotes] = useState('');
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -92,6 +100,33 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
     } catch (err) {
       console.error(err);
       setMessage({ text: 'Failed to void payment record.', type: 'danger' });
+    }
+  };
+
+  const handleUpdatePayment = async (e) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+    const amountVal = parseFloat(editPaymentAmount);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Please enter a valid payment amount.");
+      return;
+    }
+    
+    try {
+      await transactionAPI.updatePayment(editingPayment.id, {
+        customer_id: editingPayment.customer_id,
+        amount: amountVal,
+        payment_method: editPaymentMethod,
+        reference_number: editPaymentRef || null,
+        notes: editPaymentNotes || null
+      });
+      setMessage({ text: 'Payment updated and customer balance adjusted successfully.', type: 'success' });
+      setShowEditPaymentModal(false);
+      setEditingPayment(null);
+      loadTransactions();
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to update payment record.', type: 'danger' });
     }
   };
 
@@ -288,14 +323,31 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                     <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{p.reference_number || '-'}</td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.notes || '-'}</td>
                     <td style={{ padding: '1rem', textAlign: 'right' }} className="no-print">
-                      <button 
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.4rem', color: 'var(--danger)' }}
-                        title="Void Payment Collection"
-                        onClick={() => handleVoidPayment(p)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem 0.65rem' }}
+                          title="Edit Payment Details"
+                          onClick={() => {
+                            setEditingPayment(p);
+                            setEditPaymentAmount(parseFloat(p.amount).toString());
+                            setEditPaymentMethod(p.payment_method);
+                            setEditPaymentRef(p.reference_number || '');
+                            setEditPaymentNotes(p.notes || '');
+                            setShowEditPaymentModal(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem', color: 'var(--danger)' }}
+                          title="Void Payment Collection"
+                          onClick={() => handleVoidPayment(p)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -389,6 +441,73 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Edit Payment Modal */}
+      {showEditPaymentModal && editingPayment && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '440px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Payment Collection</h2>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => { setShowEditPaymentModal(false); setEditingPayment(null); }} />
+            </div>
+            
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Updating receipt <strong style={{ color: 'var(--text-primary)' }}>{editingPayment.payment_number}</strong> for <strong>{editingPayment.customer_name}</strong>
+            </p>
+            
+            <form onSubmit={handleUpdatePayment}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Payment Amount (₹) *</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input-field" 
+                  required 
+                  value={editPaymentAmount} 
+                  onChange={e => setEditPaymentAmount(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Payment Mode</label>
+                <select className="input-field" value={editPaymentMethod} onChange={e => setEditPaymentMethod(e.target.value)}>
+                  <option value="Cash">Cash (नकद)</option>
+                  <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                  <option value="Bank">Bank Transfer</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Reference Number (if UPI/Bank)</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="Transaction ID / Receipt No" 
+                  value={editPaymentRef} 
+                  onChange={e => setEditPaymentRef(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Notes</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. Corrected entry details" 
+                  value={editPaymentNotes} 
+                  onChange={e => setEditPaymentNotes(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditPaymentModal(false); setEditingPayment(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Save Changes</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
