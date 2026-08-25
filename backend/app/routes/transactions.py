@@ -13,7 +13,7 @@ from ..models.product import Product
 from ..models.transaction import Sale, SaleItem, CustomerPayment, Expense, CerealTransaction
 from ..models.inventory import StockMovement
 from ..schemas.transaction import (
-    SaleCreate, SaleResponse, CustomerPaymentCreate, CustomerPaymentResponse, 
+    SaleCreate, SaleResponse, SaleUpdate, CustomerPaymentCreate, CustomerPaymentResponse, 
     ExpenseCreate, ExpenseResponse, CerealTransactionCreate, CerealTransactionResponse
 )
 from ..dependencies.auth import get_current_user
@@ -230,6 +230,58 @@ def cancel_sale(
 
     db.commit()
     return {"message": f"Sale {sale.sale_number} cancelled and reversed successfully."}
+
+@router.put("/sales/{sale_id}", response_model=SaleResponse)
+def update_sale(
+    sale_id: int,
+    sale_in: SaleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    sale = db.query(Sale).filter(Sale.id == sale_id, Sale.status == "Active").first()
+    if not sale:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale transaction not found.")
+
+    customer = None
+    if sale.customer_id:
+        customer = db.query(Customer).filter(Customer.id == sale.customer_id).first()
+
+    # 1. Reverse old balance impact
+    if customer:
+        customer.current_balance -= sale.due_amount
+
+    # 2. Update fields
+    sale.discount = sale_in.discount
+    sale.paid_amount = sale_in.paid_amount
+    sale.payment_method = sale_in.payment_method
+
+    # 3. Recalculate total & due
+    sale.total_amount = sale.subtotal - sale_in.discount
+    if sale.total_amount < 0:
+        sale.total_amount = Decimal("0.00")
+
+    sale.due_amount = sale.total_amount - sale_in.paid_amount
+    if sale.due_amount < 0:
+        sale.due_amount = Decimal("0.00")
+
+    # 4. Update payment status
+    if sale.due_amount == 0:
+        sale.payment_status = "PAID"
+    elif sale.paid_amount > 0:
+        sale.payment_status = "PARTIALLY PAID"
+    else:
+        sale.payment_status = "UNPAID"
+
+    # 5. Apply new balance impact
+    if customer:
+        customer.current_balance += sale.due_amount
+
+    db.commit()
+    db.refresh(sale)
+    return sale
 
 @router.post("/payments/{payment_id}/cancel")
 def cancel_payment(

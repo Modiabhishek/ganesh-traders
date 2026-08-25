@@ -51,6 +51,13 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
   const [editPaymentRef, setEditPaymentRef] = useState('');
   const [editPaymentNotes, setEditPaymentNotes] = useState('');
 
+  // Sale edit modal state
+  const [showEditSaleModal, setShowEditSaleModal] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
+  const [editSaleDiscount, setEditSaleDiscount] = useState('');
+  const [editSalePaid, setEditSalePaid] = useState('');
+  const [editSaleMethod, setEditSaleMethod] = useState('Cash');
+
   const loadTransactions = async () => {
     setLoading(true);
     try {
@@ -127,6 +134,36 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
     } catch (err) {
       console.error(err);
       setMessage({ text: 'Failed to update payment record.', type: 'danger' });
+    }
+  };
+
+  const handleUpdateSale = async (e) => {
+    e.preventDefault();
+    if (!editingSale) return;
+    const discountVal = parseFloat(editSaleDiscount);
+    const paidVal = parseFloat(editSalePaid);
+    if (isNaN(discountVal) || discountVal < 0) {
+      alert("Please enter a valid discount amount (must be 0 or more).");
+      return;
+    }
+    if (isNaN(paidVal) || paidVal < 0) {
+      alert("Please enter a valid paid amount (must be 0 or more).");
+      return;
+    }
+    
+    try {
+      await transactionAPI.updateSale(editingSale.id, {
+        discount: discountVal,
+        paid_amount: paidVal,
+        payment_method: editSaleMethod
+      });
+      setMessage({ text: 'Sale updated and customer balance recalculated successfully.', type: 'success' });
+      setShowEditSaleModal(false);
+      setEditingSale(null);
+      loadTransactions();
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to update sale invoice record.', type: 'danger' });
     }
   };
 
@@ -261,6 +298,20 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }} className="no-print">
                       <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem 0.65rem' }}
+                          title="Edit Sale Details"
+                          onClick={() => {
+                            setEditingSale(s);
+                            setEditSaleDiscount(parseFloat(s.discount).toString());
+                            setEditSalePaid(parseFloat(s.paid_amount).toString());
+                            setEditSaleMethod(s.payment_method);
+                            setShowEditSaleModal(true);
+                          }}
+                        >
+                          Edit
+                        </button>
                         <button 
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '0.4rem' }}
@@ -505,6 +556,73 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowEditPaymentModal(false); setEditingPayment(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Sale Modal */}
+      {showEditSaleModal && editingSale && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '440px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Sale Details</h2>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => { setShowEditSaleModal(false); setEditingSale(null); }} />
+            </div>
+            
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Updating invoice <strong style={{ color: 'var(--text-primary)' }}>{editingSale.sale_number}</strong> for <strong>{editingSale.customer_name || 'Walk-in Cash Customer'}</strong>
+            </p>
+            
+            <form onSubmit={handleUpdateSale}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Subtotal (Before Discount)</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  disabled 
+                  value={`₹${parseFloat(editingSale.subtotal || editingSale.total_amount).toFixed(2)}`} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Discount Amount (₹)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input-field" 
+                  required 
+                  value={editSaleDiscount} 
+                  onChange={e => setEditSaleDiscount(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Paid Amount (₹)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input-field" 
+                  required 
+                  value={editSalePaid} 
+                  onChange={e => setEditSalePaid(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Payment Mode</label>
+                <select className="input-field" value={editSaleMethod} onChange={e => setEditSaleMethod(e.target.value)}>
+                  <option value="Cash">Cash (नकद)</option>
+                  <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                  <option value="Card">Card Payment</option>
+                  <option value="Credit">Credit (उधार)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditSaleModal(false); setEditingSale(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Save Changes</button>
               </div>
             </form>

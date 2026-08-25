@@ -46,6 +46,11 @@ class SaleResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class SaleUpdate(BaseModel):
+    discount: Decimal = Decimal("0.00")
+    paid_amount: Decimal = Decimal("0.00")
+    payment_method: str = Field("Cash", pattern="^(Cash|UPI|Card|Credit)$")
+
 class CustomerPaymentCreate(BaseModel):
     customer_id: int
     payment_date: Optional[datetime] = None

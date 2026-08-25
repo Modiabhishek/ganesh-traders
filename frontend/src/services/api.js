@@ -180,6 +180,10 @@ export const transactionAPI = {
     });
     return response.data;
   },
+  updateSale: async (id, saleData) => {
+    const response = await api.put(`/transactions/sales/${id}`, saleData);
+    return response.data;
+  },
   cancelPayment: async (id) => {
     const response = await api.post(`/transactions/payments/${id}/cancel`);
     return response.data;
