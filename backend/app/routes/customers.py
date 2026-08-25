@@ -280,8 +280,15 @@ def delete_customer(
     
     # Soft delete: set status to Inactive
     cust.status = "Inactive"
+    cust.portal_username = None
+    cust.portal_status = "Blocked"
+    if cust.mobile:
+        import time
+        # Append timestamp to allow reusing this mobile number for other customers
+        cust.mobile = f"{cust.mobile}_deleted_{int(time.time())}"
+        
     db.commit()
-    return {"message": "Customer deleted successfully."}
+    return {"message": "Customer deactivated successfully and username/mobile freed up."}
 
 @router.get("/portal/profile", response_model=CustomerResponse)
 def get_portal_profile(

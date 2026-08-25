@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
 from .models import User, Category, Product
+from .models.customer import Customer
 from .routes import auth, customers, products, transactions
 from .services.auth import get_password_hash
 from decimal import Decimal
@@ -80,6 +81,26 @@ def startup_event():
             admin.role = "Admin"
             admin.password_hash = get_password_hash("adminpass")
             db.commit()
+
+        # Free up portal_username and clean up mobile for any existing Inactive customers
+        try:
+            inactive_custs = db.query(Customer).filter(Customer.status == "Inactive").all()
+            for ic in inactive_custs:
+                changed = False
+                if ic.portal_username:
+                    ic.portal_username = None
+                    changed = True
+                if ic.mobile and "_deleted_" not in ic.mobile:
+                    import time
+                    ic.mobile = f"{ic.mobile}_deleted_{int(time.time())}"
+                    changed = True
+                if changed:
+                    db.add(ic)
+            if inactive_custs:
+                db.commit()
+        except Exception as e:
+            print("Failed to run inactive customer cleanup migration:", e)
+            db.rollback()
 
         # Seed initial product categories
         default_categories = ["Grocery / Daily Needs", "Pooja Items", "Household", "Personal Care", "Other", "Cereals & Crops"]
