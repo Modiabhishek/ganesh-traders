@@ -80,14 +80,14 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
         let todayCollectionSum = 0;
 
         sales.forEach(s => {
-          if (parseNaiveDate(s.sale_date).toDateString() === todayStr) {
+          if (s.status === 'Active' && parseNaiveDate(s.sale_date).toDateString() === todayStr) {
             todaySalesSum += parseFloat(s.total_amount) || 0;
             todayCollectionSum += parseFloat(s.paid_amount) || 0;
           }
         });
 
         payments.forEach(p => {
-          if (parseNaiveDate(p.payment_date).toDateString() === todayStr) {
+          if (p.status === 'Active' && parseNaiveDate(p.payment_date).toDateString() === todayStr) {
             todayCollectionSum += parseFloat(p.amount) || 0;
           }
         });
