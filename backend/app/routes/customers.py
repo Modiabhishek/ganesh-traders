@@ -1,6 +1,7 @@
 import csv
 import io
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal
@@ -56,8 +57,8 @@ def create_customer(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Customer with mobile {customer_in.mobile} already exists.")
 
     if customer_in.portal_username:
-        dup_u = db.query(User).filter(User.username == customer_in.portal_username).first()
-        dup_c = db.query(Customer).filter(Customer.portal_username == customer_in.portal_username).first()
+        dup_u = db.query(User).filter(func.lower(User.username) == func.lower(customer_in.portal_username), User.status == "Active").first()
+        dup_c = db.query(Customer).filter(func.lower(Customer.portal_username) == func.lower(customer_in.portal_username), Customer.status == "Active").first()
         if dup_u or dup_c:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Portal username already exists.")
 
@@ -112,8 +113,8 @@ def update_customer(
 
     if "portal_username" in update_data and update_data["portal_username"]:
         username = update_data["portal_username"]
-        dup_u = db.query(User).filter(User.username == username).first()
-        dup_c = db.query(Customer).filter(Customer.portal_username == username, Customer.id != customer_id).first()
+        dup_u = db.query(User).filter(func.lower(User.username) == func.lower(username), User.status == "Active").first()
+        dup_c = db.query(Customer).filter(func.lower(Customer.portal_username) == func.lower(username), Customer.status == "Active", Customer.id != customer_id).first()
         if dup_u or dup_c:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Portal username already exists.")
 
