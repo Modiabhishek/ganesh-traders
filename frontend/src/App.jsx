@@ -70,6 +70,10 @@ function App() {
   // Theme state
   const [darkTheme, setDarkTheme] = useState(localStorage.getItem('theme') === 'dark');
 
+  // Shutter state
+  const [showShutter, setShowShutter] = useState(false);
+  const [isShutterOpening, setIsShutterOpening] = useState(false);
+
   // Sync theme to body element
   useEffect(() => {
     if (darkTheme) {
@@ -89,6 +93,20 @@ function App() {
       const data = await authAPI.login(username, password);
       localStorage.setItem('token', data.access_token);
       setToken(data.access_token);
+      
+      // Trigger shutter animation
+      setShowShutter(true);
+      setIsShutterOpening(false);
+      
+      setTimeout(() => {
+        setIsShutterOpening(true);
+      }, 600);
+
+      setTimeout(() => {
+        setShowShutter(false);
+        setIsShutterOpening(false);
+      }, 2200);
+
       setCurrentPage('dashboard');
     } catch (err) {
       console.error(err);
@@ -337,6 +355,154 @@ function App() {
         {renderPage()}
       </main>
 
+      {/* Shop Shutter Opening Animation Overlay */}
+      {showShutter && (
+        <div 
+          className={`shop-shutter-overlay ${isShutterOpening ? 'shutter-open' : ''}`}
+        >
+          {/* Corrugated Shutter Steel Body */}
+          <div className="shutter-body">
+            {[...Array(24)].map((_, i) => (
+              <div key={i} className="shutter-segment" />
+            ))}
+            
+            {/* Shop Board on Shutter */}
+            <div className="shutter-board">
+              <div className="shutter-blessing">
+                ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
+              </div>
+              <h1 className="shutter-title">गणेश ट्रेडर्स</h1>
+              <div className="shutter-subtitle">
+                Vyapaar Manager
+              </div>
+            </div>
+
+            {/* Shutter bottom bar locks/handle */}
+            <div className="shutter-bottom-bar">
+              <div className="shutter-handle-left" />
+              <div className="shutter-lock" />
+              <div className="shutter-handle-right" />
+            </div>
+          </div>
+
+          <style>{`
+            .shop-shutter-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              z-index: 99999;
+              background: #1f2937;
+              overflow: hidden;
+              display: flex;
+              flex-direction: column;
+              transition: transform 1.6s cubic-bezier(0.77, 0, 0.175, 1);
+              transform: translateY(0);
+            }
+
+            .shop-shutter-overlay.shutter-open {
+              transform: translateY(-100%);
+            }
+
+            .shutter-body {
+              position: relative;
+              width: 100%;
+              height: 100%;
+              background: linear-gradient(to right, #4b5563 0%, #9ca3af 20%, #f3f4f6 50%, #9ca3af 80%, #4b5563 100%);
+              border-bottom: 12px solid #111827;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
+            }
+
+            .shutter-segment {
+              width: 100%;
+              height: 4.16%;
+              border-bottom: 2px solid #374151;
+              box-shadow: inset 0 2px 2px rgba(255,255,255,0.2), 0 2px 5px rgba(0,0,0,0.3);
+              pointer-events: none;
+            }
+
+            .shutter-board {
+              position: absolute;
+              background: #fffefb;
+              border: 5px double #b91c1c;
+              border-radius: 8px;
+              padding: 2.25rem 4.5rem;
+              text-align: center;
+              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+              max-width: 90%;
+              animation: shutterFloat 3s ease-in-out infinite;
+            }
+
+            .shutter-blessing {
+              font-size: 1.15rem;
+              font-weight: 700;
+              color: #b91c1c;
+              margin-bottom: 0.75rem;
+              letter-spacing: 0.5px;
+            }
+
+            .shutter-title {
+              font-size: 3.75rem;
+              font-weight: 900;
+              color: #b91c1c;
+              text-shadow: 2px 2px 0px #fecaca, 4px 4px 10px rgba(0,0,0,0.35);
+              margin: 0;
+              letter-spacing: 1px;
+            }
+
+            .shutter-subtitle {
+              font-size: 1.15rem;
+              font-weight: 700;
+              color: #1e3a8a;
+              text-transform: uppercase;
+              letter-spacing: 4px;
+              margin-top: 0.6rem;
+            }
+
+            .shutter-bottom-bar {
+              position: absolute;
+              bottom: 0;
+              width: 100%;
+              height: 48px;
+              background: #111827;
+              border-top: 3px solid #4b5563;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 4rem;
+            }
+
+            .shutter-handle-left, .shutter-handle-right {
+              width: 90px;
+              height: 14px;
+              background: #9ca3af;
+              border-radius: 6px;
+              border: 3px solid #1f2937;
+              box-shadow: inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+
+            .shutter-lock {
+              width: 28px;
+              height: 28px;
+              background: #d97706;
+              border-radius: 50%;
+              border: 4px solid #1f2937;
+              box-shadow: inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+
+            @keyframes shutterFloat {
+              0% { transform: translateY(0px); }
+              50% { transform: translateY(-6px); }
+              100% { transform: translateY(0px); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }
