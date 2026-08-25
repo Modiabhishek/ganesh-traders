@@ -63,6 +63,9 @@ const CustomerPortal = ({ token, onLogout }) => {
 
   return (
     <div className="layout-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem', animation: 'fadeIn 0.25s ease' }}>
+      <div style={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: '#b91c1c', marginBottom: '1.5rem', letterSpacing: '0.5px' }} className="no-print">
+        ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
+      </div>
       
       {/* Portal Header */}
       <header className="flex-between no-print" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>

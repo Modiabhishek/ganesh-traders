@@ -116,6 +116,9 @@ function App() {
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', padding: '1rem' }}>
         <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem 2rem', animation: 'scaleUp 0.3s ease' }}>
           <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b91c1c', marginBottom: '0.75rem', letterSpacing: '0.5px' }}>
+              ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
+            </div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>Ganesh Traders</h1>
             <p style={{ color: 'var(--text-secondary)' }}>Sign in to manage your family business</p>
           </header>

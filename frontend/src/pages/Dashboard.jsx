@@ -119,6 +119,9 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
 
   return (
     <div className="layout-container" style={{ animation: 'fadeIn 0.3s ease' }}>
+      <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 700, color: '#b91c1c', marginBottom: '1.5rem', letterSpacing: '0.5px' }}>
+        ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
+      </div>
       {error && (
         <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem' }}>
           <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Connection/Server Error:</p>
