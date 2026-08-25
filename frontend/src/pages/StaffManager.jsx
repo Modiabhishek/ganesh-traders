@@ -13,6 +13,13 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
   const [role, setRole] = useState('Staff');
   const [message, setMessage] = useState({ text: '', type: '' });
 
+  // Edit Staff states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editRole, setEditRole] = useState('Staff');
+
   const loadStaff = async () => {
     setLoading(true);
     try {
@@ -76,6 +83,34 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
     } catch (err) {
       console.error(err);
       setMessage({ text: 'Failed to deactivate staff account.', type: 'danger' });
+    }
+  };
+
+  const handleUpdateStaff = async (e) => {
+    e.preventDefault();
+    if (editUsername.trim().length < 3) {
+      alert("Username must be at least 3 characters.");
+      return;
+    }
+    if (editPassword && editPassword.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      await authAPI.updateUser(editingStaff.id, {
+        username: editUsername.trim(),
+        password: editPassword || null,
+        role: editRole
+      });
+      setMessage({ text: `Staff account updated successfully!`, type: 'success' });
+      setShowEditModal(false);
+      setEditingStaff(null);
+      loadStaff();
+    } catch (err) {
+      console.error(err);
+      const detail = err.response?.data?.detail || 'Failed to update staff account.';
+      alert(detail);
     }
   };
 
@@ -186,16 +221,32 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
                     {new Date(staff.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    {staff.username !== 'admin' && (
+                    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                       <button 
                         className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.4rem', color: 'var(--danger)' }}
-                        title="Deactivate staff login"
-                        onClick={() => handleDeleteStaff(staff)}
+                        style={{ padding: '0.4rem 0.65rem' }}
+                        title="Edit staff details"
+                        onClick={() => {
+                          setEditingStaff(staff);
+                          setEditUsername(staff.username);
+                          setEditPassword('');
+                          setEditRole(staff.role);
+                          setShowEditModal(true);
+                        }}
                       >
-                        <Trash2 size={14} />
+                        Edit
                       </button>
-                    )}
+                      {staff.username !== 'admin' && (
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem', color: 'var(--danger)' }}
+                          title="Deactivate staff login"
+                          onClick={() => handleDeleteStaff(staff)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -204,6 +255,70 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
         </section>
       )}
 
+      {/* Edit Staff Modal */}
+      {showEditModal && editingStaff && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '440px', background: 'var(--bg-secondary)', animation: 'scaleUp 0.2s ease', padding: '2rem' }}>
+            <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Staff Account</h2>
+              <button 
+                type="button" 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-secondary)' }}
+                onClick={() => { setShowEditModal(false); setEditingStaff(null); }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStaff}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Username *</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  required 
+                  value={editUsername} 
+                  onChange={e => setEditUsername(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">New Password (Leave blank to keep current)</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  placeholder="Enter new password (min 6 characters)"
+                  value={editPassword} 
+                  onChange={e => setEditPassword(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Role Level</label>
+                <select 
+                  className="input-field" 
+                  disabled={editingStaff.username === 'admin'}
+                  value={editRole} 
+                  onChange={e => setEditRole(e.target.value)}
+                >
+                  <option value="Staff">Staff (बिक्री कर्मचारी - POS access only)</option>
+                  <option value="Admin">Admin (पूर्ण अधिकार - Complete control)</option>
+                </select>
+                {editingStaff.username === 'admin' && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                    The default admin role level cannot be modified.
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowEditModal(false); setEditingStaff(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--primary)', color: 'white' }}>Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

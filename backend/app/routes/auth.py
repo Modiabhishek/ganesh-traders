@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -96,3 +97,40 @@ def delete_user(
     user_to_delete.status = "Inactive"
     db.commit()
     return {"message": "Staff member deactivated successfully."}
+
+class UserUpdate(BaseModel):
+    username: str
+    password: Optional[str] = None
+    role: str
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    user_in: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can edit user accounts.")
+
+    user = db.query(User).filter(User.id == user_id, User.status == "Active").first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    # Check username uniqueness if changed
+    if user_in.username != user.username:
+        exists = db.query(User).filter(User.username == user_in.username, User.status == "Active").first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
+        user.username = user_in.username
+
+    if user_in.password:
+        user.password_hash = get_password_hash(user_in.password)
+
+    # Prevent changing role of default admin
+    if user.username != "admin":
+        user.role = user_in.role
+
+    db.commit()
+    db.refresh(user)
+    return user
