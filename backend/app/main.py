@@ -16,7 +16,8 @@ app = FastAPI(title="Family Business Management System")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://ganesh-traders.netlify.app",  # Placeholder: User will provide their Netlify URL
+        "https://ganesh-traders.netlify.app",
+        "https://ganesh-traders.vercel.app",
         "http://localhost:3000",
         "http://localhost:5173",
     ],
