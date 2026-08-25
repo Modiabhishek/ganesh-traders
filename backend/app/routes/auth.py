@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user_in.username).first()
+    db_user = db.query(User).filter(func.lower(User.username) == func.lower(user_in.username)).first()
     if db_user:
         if db_user.status == "Active":
             raise HTTPException(
@@ -41,7 +42,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     # 1. Check User table (Staff / Admin)
-    user = db.query(User).filter(User.username == form_data.username, User.status == "Active").first()
+    user = db.query(User).filter(func.lower(User.username) == func.lower(form_data.username), User.status == "Active").first()
     if user and verify_password(form_data.password, user.password_hash):
         access_token = create_access_token(data={"sub": user.username, "role": user.role})
         return {"access_token": access_token, "token_type": "bearer"}
@@ -117,12 +118,11 @@ def update_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-    # Check username uniqueness if changed
-    if user_in.username != user.username:
-        exists = db.query(User).filter(User.username == user_in.username, User.status == "Active").first()
-        if exists:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
-        user.username = user_in.username
+    if user_in.username.lower() != user.username.lower():
+      exists = db.query(User).filter(func.lower(User.username) == func.lower(user_in.username), User.status == "Active").first()
+      if exists:
+          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken.")
+      user.username = user_in.username
 
     if user_in.password:
         user.password_hash = get_password_hash(user_in.password)
