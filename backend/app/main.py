@@ -17,6 +17,7 @@ app = FastAPI(title="Family Business Management System")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://ganesh-traders.modi.app",
         "http://localhost:3000",
         "http://localhost:5173",
     ],
