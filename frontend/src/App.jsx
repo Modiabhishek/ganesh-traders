@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Vercel auto-deploy trigger
 import { authAPI } from './services/api';
 import Dashboard from './pages/Dashboard';
 import CustomerList from './pages/CustomerList';
