@@ -66,7 +66,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     )
 
 from ..dependencies.auth import get_current_user
-from typing import List
+from typing import List, Optional
 
 @router.get("/users", response_model=List[UserResponse])
 def get_users(
