@@ -23,3 +23,16 @@ class Customer(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Customer Portal Credentials
+    portal_username = Column(String, unique=True, index=True, nullable=True)
+    portal_password_hash = Column(String, nullable=True)
+    portal_status = Column(String, default="Blocked", nullable=False) # "Allowed", "Blocked"
+
+class LiveUpdate(Base):
+    __tablename__ = "live_updates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
