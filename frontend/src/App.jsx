@@ -30,6 +30,7 @@ const decodeToken = (token) => {
 };
 
 function App() {
+  const hasToken = !!(localStorage.getItem('token') || '');
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectCustomerId, setSelectCustomerId] = useState(null);
@@ -83,7 +84,7 @@ function App() {
   const [isShutterOpening, setIsShutterOpening] = useState(false);
 
   // Curtain state
-  const [showCurtain, setShowCurtain] = useState(false);
+  const [showCurtain, setShowCurtain] = useState(!hasToken);
   const [isCurtainOpening, setIsCurtainOpening] = useState(false);
 
   // Slide curtains open on initial page load
@@ -171,167 +172,7 @@ function App() {
     setPassword('');
   };
 
-  // Render Login Panel
-  if (!token) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, var(--bg-secondary) 30%, var(--bg-primary) 100%)', padding: '1rem', position: 'relative', overflow: 'hidden' }}>
-        
-        {/* Theater Curtains (Always visible on sides of Login Page) */}
-        <div className="theater-curtains-overlay no-print">
-          <div className="curtain-valance" />
-          <div className={`curtain-panel left-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
-          <div className={`curtain-panel right-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
-        </div>
 
-        {/* Decorative Garland of Flowers (गेंदे के फूल की माला) */}
-        <div className="flower-garland no-print">
-          {[...Array(20)].map((_, i) => (
-            <div key={i} className="flower-node" style={{ animationDelay: `${i * 0.15}s` }} />
-          ))}
-        </div>
-
-        {/* Floating Grocery Theme Icons in Background */}
-        <div className="grocery-theme-bg no-print">
-          <div className="floating-item item-1" style={{ top: '15%', left: '12%' }}><Store size={48} /></div>
-          <div className="floating-item item-2" style={{ top: '65%', left: '80%', animationDelay: '1s' }}><ShoppingBag size={44} /></div>
-          <div className="floating-item item-3" style={{ top: '75%', left: '15%', animationDelay: '2s' }}><Package size={40} /></div>
-          <div className="floating-item item-4" style={{ top: '20%', left: '82%', animationDelay: '3s' }}><Sprout size={44} /></div>
-          <div className="floating-item item-5" style={{ top: '45%', left: '8%', animationDelay: '4.5s' }}><Sparkles size={36} /></div>
-          <div className="floating-item item-6" style={{ top: '80%', left: '50%', animationDelay: '1.5s' }}><Store size={36} /></div>
-        </div>
-
-        {/* Central Login Card */}
-        <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem 2rem', zIndex: 10, animation: 'scaleUp 0.35s ease', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', borderTop: '4px solid var(--primary)', position: 'relative', background: 'rgba(var(--bg-secondary-rgb), 0.8)' }}>
-          <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.75rem', letterSpacing: '1px' }}>
-              ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
-            </div>
-            <h1 style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em', marginBottom: '0.25rem', textShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>गणेश ट्रेडर्स</h1>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '1rem', letterSpacing: '0.5px' }}>
-              डिजिटल स्टोर - आपका विश्वसनीय किराना व्यापार
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Sign in to manage your digital store dashboard</p>
-          </header>
-
-          {authError && (
-            <div className="badge badge-danger" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', display: 'block', textTransform: 'none' }}>
-              {authError}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin}>
-            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label">Username</label>
-              <input 
-                type="text" 
-                className="input-field" 
-                required 
-                value={username} 
-                onChange={e => setUsername(e.target.value)} 
-                placeholder="e.g. admin"
-              />
-            </div>
-            
-            <div className="form-group" style={{ marginBottom: '1.75rem' }}>
-              <label className="form-label">Password</label>
-              <input 
-                type="password" 
-                className="input-field" 
-                required 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1rem' }} disabled={loading}>
-              <LogIn size={18} /> {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-
-          {isCapacitor && (
-            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', animation: 'fadeIn 0.3s ease' }}>
-              <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
-                Server PC IP Address (Wi-Fi IP)
-              </label>
-              <input 
-                type="text" 
-                className="input-field" 
-                style={{ fontSize: '0.9rem', padding: '0.6rem 0.75rem', background: 'var(--bg-primary)' }}
-                value={serverIP}
-                onChange={e => {
-                  setServerIP(e.target.value);
-                  localStorage.setItem('server_ip', e.target.value);
-                }}
-                placeholder="e.g. 192.168.1.15"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Local CSS for Garland & Floating items */}
-        <style>{`
-          .flower-garland {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 35px;
-            display: flex;
-            justify-content: space-around;
-            pointer-events: none;
-            z-index: 50;
-            padding: 0 10px;
-          }
-          .flower-node {
-            width: 22px;
-            height: 22px;
-            background: radial-gradient(circle, #f59e0b 45%, #ea580c 85%);
-            border-radius: 50%;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.15), inset 0 2px 2px rgba(255,255,255,0.4);
-            transform-origin: top center;
-            animation: swing 4s ease-in-out infinite alternate;
-            position: relative;
-          }
-          .flower-node::before {
-            content: '';
-            position: absolute;
-            top: -6px;
-            left: 10px;
-            width: 2px;
-            height: 8px;
-            background: #15803d; /* Green stem thread */
-          }
-          .flower-node:nth-child(even) {
-            background: radial-gradient(circle, #ea580c 45%, #b45309 85%);
-          }
-          .grocery-theme-bg {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            overflow: hidden;
-            pointer-events: none;
-            z-index: 1;
-          }
-          .floating-item {
-            position: absolute;
-            color: rgba(245, 158, 11, 0.15); /* Gold transparent */
-            animation: floatSlow 6s infinite alternate ease-in-out;
-          }
-          @keyframes swing {
-            0% { transform: rotate(-8deg); }
-            100% { transform: rotate(8deg); }
-          }
-          @keyframes floatSlow {
-            0% { transform: translateY(0px) rotate(0deg); }
-            100% { transform: translateY(-30px) rotate(20deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
 
   const userPayload = decodeToken(token);
   const userRole = userPayload?.role || null;
@@ -371,16 +212,169 @@ function App() {
   };
 
   return (
-    <div className="sidebar-container" style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="sidebar-container" style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
       
-      {/* Mobile Top Header (Show only on phone view) */}
-      <header className="mobile-header no-print">
-        <button className="menu-toggle-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          <Menu size={24} />
-        </button>
-        <span className="mobile-title">गणेश ट्रेडर्स</span>
-        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>।। श्री गणेशाय नमः ।।</div>
-      </header>
+      {!token ? (
+        /* Login Page View */
+        <div style={{ display: 'flex', flex: 1, minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, var(--bg-secondary) 30%, var(--bg-primary) 100%)', padding: '1rem', position: 'relative', overflow: 'hidden', width: '100%' }}>
+          
+          {/* Decorative Garland of Flowers (गेंदे के फूल की माला) */}
+          <div className="flower-garland no-print">
+            {[...Array(20)].map((_, i) => (
+              <div key={i} className="flower-node" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+
+          {/* Floating Grocery Theme Icons in Background */}
+          <div className="grocery-theme-bg no-print">
+            <div className="floating-item item-1" style={{ top: '15%', left: '12%' }}><Store size={48} /></div>
+            <div className="floating-item item-2" style={{ top: '65%', left: '80%', animationDelay: '1s' }}><ShoppingBag size={44} /></div>
+            <div className="floating-item item-3" style={{ top: '75%', left: '15%', animationDelay: '2s' }}><Package size={40} /></div>
+            <div className="floating-item item-4" style={{ top: '20%', left: '82%', animationDelay: '3s' }}><Sprout size={44} /></div>
+            <div className="floating-item item-5" style={{ top: '45%', left: '8%', animationDelay: '4.5s' }}><Sparkles size={36} /></div>
+            <div className="floating-item item-6" style={{ top: '80%', left: '50%', animationDelay: '1.5s' }}><Store size={36} /></div>
+          </div>
+
+          {/* Central Login Card */}
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem 2rem', zIndex: 10, animation: 'scaleUp 0.35s ease', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', borderTop: '4px solid var(--primary)', position: 'relative', background: 'rgba(var(--bg-secondary-rgb), 0.8)' }}>
+            <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.75rem', letterSpacing: '1px' }}>
+                ।। श्री गणेशाय नमः ।। श्री श्याम देवाय नमः ।। श्री पितृदेवाय नमः ।।
+              </div>
+              <h1 style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em', marginBottom: '0.25rem', textShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>गणेश ट्रेडर्स</h1>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '1rem', letterSpacing: '0.5px' }}>
+                डिजिटल स्टोर - आपका विश्वसनीय किराना व्यापार
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Sign in to manage your digital store dashboard</p>
+            </header>
+
+            {authError && (
+              <div className="badge badge-danger" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', display: 'block', textTransform: 'none' }}>
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin}>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Username</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  required 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)} 
+                  placeholder="e.g. admin"
+                />
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: '1.75rem' }}>
+                <label className="form-label">Password</label>
+                <input 
+                  type="password" 
+                  className="input-field" 
+                  required 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1rem' }} disabled={loading}>
+                <LogIn size={18} /> {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            {isCapacitor && (
+              <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', animation: 'fadeIn 0.3s ease' }}>
+                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
+                  Server PC IP Address (Wi-Fi IP)
+                </label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ fontSize: '0.9rem', padding: '0.6rem 0.75rem', background: 'var(--bg-primary)' }}
+                  value={serverIP}
+                  onChange={e => {
+                    setServerIP(e.target.value);
+                    localStorage.setItem('server_ip', e.target.value);
+                  }}
+                  placeholder="e.g. 192.168.1.15"
+                />
+              </div>
+            )}
+          </div>
+
+          <style>{`
+            .flower-garland {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 35px;
+              display: flex;
+              justify-content: space-around;
+              pointer-events: none;
+              z-index: 50;
+              padding: 0 10px;
+            }
+            .flower-node {
+              width: 22px;
+              height: 22px;
+              background: radial-gradient(circle, #f59e0b 45%, #ea580c 85%);
+              border-radius: 50%;
+              box-shadow: 0 3px 6px rgba(0,0,0,0.15), inset 0 2px 2px rgba(255,255,255,0.4);
+              transform-origin: top center;
+              animation: swing 4s ease-in-out infinite alternate;
+              position: relative;
+            }
+            .flower-node::before {
+              content: '';
+              position: absolute;
+              top: -6px;
+              left: 10px;
+              width: 2px;
+              height: 8px;
+              background: #15803d;
+            }
+            .flower-node:nth-child(even) {
+              background: radial-gradient(circle, #ea580c 45%, #b45309 85%);
+            }
+            .grocery-theme-bg {
+              position: absolute;
+              width: 100%;
+              height: 100%;
+              top: 0;
+              left: 0;
+              overflow: hidden;
+              pointer-events: none;
+              z-index: 1;
+            }
+            .floating-item {
+              position: absolute;
+              color: rgba(245, 158, 11, 0.15);
+              animation: floatSlow 6s infinite alternate ease-in-out;
+            }
+            @keyframes swing {
+              0% { transform: rotate(-8deg); }
+              100% { transform: rotate(8deg); }
+            }
+            @keyframes floatSlow {
+              0% { transform: translateY(0px) rotate(0deg); }
+              100% { transform: translateY(-30px) rotate(20deg); }
+            }
+          `}</style>
+        </div>
+      ) : (
+        /* Main Dashboard view if logged in */
+        <>
+          {/* Mobile Top Header (Show only on phone view) */}
+          <header className="mobile-header no-print">
+            <button className="menu-toggle-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+              <Menu size={24} />
+            </button>
+            <span className="mobile-title">गणेश ट्रेडर्स</span>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>।। श्री गणेशाय नमः ।।</div>
+          </header>
 
       {/* Sidebar overlay to close sidebar when clicking outside on mobile */}
       {sidebarOpen && (
@@ -506,6 +500,8 @@ function App() {
       <main className="app-main-content" style={{ flex: 1, overflowY: 'auto' }}>
         {renderPage()}
       </main>
+    </>
+  )}
 
       {/* Theater Curtains Opening Animation Overlay */}
       {showCurtain && (
