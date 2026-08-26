@@ -84,7 +84,7 @@ function App() {
 
   // Curtain state
   const [showCurtain, setShowCurtain] = useState(false);
-  const [isCurtainOpening, setIsCurtainOpening] = useState(false);
+  const [isCurtainOpening, setIsCurtainOpening] = useState(true);
 
   // Sync theme to body element
   useEffect(() => {
@@ -165,6 +165,13 @@ function App() {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, var(--bg-secondary) 30%, var(--bg-primary) 100%)', padding: '1rem', position: 'relative', overflow: 'hidden' }}>
         
+        {/* Theater Curtains (Always visible on sides of Login Page) */}
+        <div className="theater-curtains-overlay no-print">
+          <div className="curtain-valance" />
+          <div className={`curtain-panel left-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
+          <div className={`curtain-panel right-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
+        </div>
+
         {/* Decorative Garland of Flowers (गेंदे के फूल की माला) */}
         <div className="flower-garland no-print">
           {[...Array(20)].map((_, i) => (
@@ -814,7 +821,7 @@ function App() {
         }
 
         .left-curtain.curtain-open {
-          transform: translateX(-100%);
+          transform: translateX(-82%);
         }
 
         .right-curtain {
@@ -823,7 +830,7 @@ function App() {
         }
 
         .right-curtain.curtain-open {
-          transform: translateX(100%);
+          transform: translateX(82%);
         }
       `}</style>
     </div>
