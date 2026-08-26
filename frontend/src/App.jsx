@@ -90,7 +90,7 @@ function App() {
 
   // Slide curtains open on initial page load
   useEffect(() => {
-    if (!token) {
+    if (!token && !curtainClickable) {
       setIsCurtainOpening(false);
       const openTimer = setTimeout(() => {
         setIsCurtainOpening(true);
@@ -103,7 +103,7 @@ function App() {
         clearTimeout(hideTimer);
       };
     }
-  }, [token]);
+  }, [token, curtainClickable]);
 
   // Sync theme to body element
   useEffect(() => {
@@ -122,6 +122,9 @@ function App() {
     setLoading(true);
     try {
       const data = await authAPI.login(username, password);
+      
+      // Reset curtain clickable state immediately
+      setCurtainClickable(false);
       
       // 1. Mount curtains in open state and slide them closed over the login page
       setShowCurtain(true);
