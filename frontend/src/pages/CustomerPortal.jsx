@@ -11,6 +11,34 @@ const CUSTOMER_QUOTES = [
   "A satisfied customer is the best business strategy of all."
 ];
 
+const parseNaiveDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
+    let workingStr = dateStr;
+    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+      workingStr = dateStr + 'Z';
+    }
+
+    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
+      return new Date(workingStr);
+    }
+    const parts = workingStr.replace('T', ' ').split(' ');
+    const dateParts = parts[0].split('-');
+    const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+    return new Date(
+      parseInt(dateParts[0], 10),
+      parseInt(dateParts[1], 10) - 1,
+      parseInt(dateParts[2], 10),
+      parseInt(timeParts[0], 10),
+      parseInt(timeParts[1], 10)
+    );
+  } catch (e) {
+    return new Date(dateStr);
+  }
+};
+
 const CustomerPortal = ({ token, onLogout }) => {
   const [customer, setCustomer] = useState(null);
   const [ledger, setLedger] = useState([]);
@@ -168,7 +196,7 @@ const CustomerPortal = ({ token, onLogout }) => {
                 <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{update.title}</h3>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {new Date(update.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    {parseNaiveDate(update.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{update.content}</p>
@@ -201,7 +229,7 @@ const CustomerPortal = ({ token, onLogout }) => {
               {ledger.map((item, idx) => (
                 <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }} className="hover-card">
                   <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                    {new Date(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {parseNaiveDate(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{item.type}</td>
                   <td style={{ padding: '1rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{item.reference}</td>

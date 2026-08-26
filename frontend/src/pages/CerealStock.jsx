@@ -2,6 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { productAPI, cerealAPI } from '../services/api';
 import { Search, Edit3, Trash2, Loader, CheckCircle, ArrowLeft, Printer, RefreshCw, PlusCircle, TrendingUp, TrendingDown, ClipboardList } from 'lucide-react';
 
+const parseNaiveDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
+    let workingStr = dateStr;
+    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+      workingStr = dateStr + 'Z';
+    }
+
+    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
+      return new Date(workingStr);
+    }
+    const parts = workingStr.replace('T', ' ').split(' ');
+    const dateParts = parts[0].split('-');
+    const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+    return new Date(
+      parseInt(dateParts[0], 10),
+      parseInt(dateParts[1], 10) - 1,
+      parseInt(dateParts[2], 10),
+      parseInt(timeParts[0], 10),
+      parseInt(timeParts[1], 10)
+    );
+  } catch (e) {
+    return new Date(dateStr);
+  }
+};
+
 const CerealStock = ({ setCurrentPage, goBack }) => {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -209,7 +237,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
 
     // Filter transactions to current month
     const currentMonthTxs = transactions.filter(t => {
-      const d = new Date(t.created_at);
+      const d = parseNaiveDate(t.created_at);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     });
 
@@ -550,7 +578,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
                 ) : (
                   transactions.map(t => {
                     const prodName = products.find(p => p.id === t.product_id)?.name || 'Unknown Crop';
-                    const txDate = new Date(t.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    const txDate = parseNaiveDate(t.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
                     
                     return (
                       <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }}>

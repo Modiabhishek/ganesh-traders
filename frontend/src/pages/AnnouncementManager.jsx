@@ -2,6 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { customerAPI } from '../services/api';
 import { Bell, PlusCircle, Trash2, RefreshCw, X, AlertCircle } from 'lucide-react';
 
+const parseNaiveDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
+    let workingStr = dateStr;
+    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+      workingStr = dateStr + 'Z';
+    }
+
+    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
+      return new Date(workingStr);
+    }
+    const parts = workingStr.replace('T', ' ').split(' ');
+    const dateParts = parts[0].split('-');
+    const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+    return new Date(
+      parseInt(dateParts[0], 10),
+      parseInt(dateParts[1], 10) - 1,
+      parseInt(dateParts[2], 10),
+      parseInt(timeParts[0], 10),
+      parseInt(timeParts[1], 10)
+    );
+  } catch (e) {
+    return new Date(dateStr);
+  }
+};
+
 const AnnouncementManager = ({ setCurrentPage, goBack }) => {
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +140,7 @@ const AnnouncementManager = ({ setCurrentPage, goBack }) => {
 
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.25rem', width: '80%' }}>{up.title}</h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '1rem' }}>
-                Published on: {new Date(up.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                Published on: {parseNaiveDate(up.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
               <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
                 {up.content}
