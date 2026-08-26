@@ -537,7 +537,7 @@ function App() {
         <div 
           className={`theater-curtains-overlay no-print ${curtainClickable ? 'clickable' : ''}`}
           onClick={handleCurtainClick}
-          style={{ cursor: curtainClickable ? 'pointer' : 'default' }}
+          style={{ cursor: curtainClickable ? 'pointer' : 'default', pointerEvents: curtainClickable ? 'auto' : 'none' }}
         >
           <div className="curtain-valance" />
           {curtainClickable && (
