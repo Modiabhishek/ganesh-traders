@@ -15,6 +15,8 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
     name: '',
     mobile: '',
     address: '',
+    fathers_name: '',
+    reference: '',
     customer_type: 'Retail',
     payment_type: 'Cash',
     opening_balance: '0.00',
@@ -86,6 +88,8 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
         name: '',
         mobile: '',
         address: '',
+        fathers_name: '',
+        reference: '',
         customer_type: 'Retail',
         payment_type: 'Cash',
         opening_balance: '0.00',
@@ -116,6 +120,8 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
         name: editingCustomer.name,
         mobile: editingCustomer.mobile || null,
         address: editingCustomer.address || null,
+        fathers_name: editingCustomer.fathers_name || null,
+        reference: editingCustomer.reference || null,
         customer_type: editingCustomer.customer_type,
         payment_type: editingCustomer.payment_type,
         credit_limit: parseFloat(editingCustomer.credit_limit || 0),
@@ -239,6 +245,14 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
             <input type="text" className="input-field" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} />
           </div>
           <div className="form-group">
+            <label className="form-label">Father's Name (पिता का नाम)</label>
+            <input type="text" className="input-field" placeholder="Father's name" value={newCustomer.fathers_name} onChange={e => setNewCustomer({ ...newCustomer, fathers_name: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reference (संदर्भ)</label>
+            <input type="text" className="input-field" placeholder="e.g. Ramesh ji, Self" value={newCustomer.reference} onChange={e => setNewCustomer({ ...newCustomer, reference: e.target.value })} />
+          </div>
+          <div className="form-group">
             <label className="form-label">Customer Type</label>
             <select className="input-field" value={newCustomer.customer_type} onChange={e => setNewCustomer({ ...newCustomer, customer_type: e.target.value })}>
               <option value="Retail">Retail (फुटकर)</option>
@@ -344,7 +358,14 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
               {customers.map((c) => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-card">
                   <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary)' }}>{c.customer_code}</td>
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>{c.name}</td>
+                  <td style={{ padding: '1rem', fontWeight: 500 }}>
+                    <div>{c.name}</div>
+                    {c.fathers_name && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        पिता: {c.fathers_name}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                       <PhoneCall size={12} /> {c.mobile || 'N/A'}
@@ -352,6 +373,11 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                       <MapPin size={12} /> {c.address || 'Local shop'}
                     </div>
+                    {c.reference && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: '0.2rem', fontWeight: 500 }}>
+                        Ref: {c.reference}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <span className={`badge ${c.customer_type === 'Wholesale' ? 'badge-info' : 'badge-success'}`}>
@@ -517,6 +543,14 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">Address</label>
                 <input type="text" className="input-field" value={editingCustomer.address || ''} onChange={e => setEditingCustomer({ ...editingCustomer, address: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Father's Name (पिता का नाम)</label>
+                <input type="text" className="input-field" value={editingCustomer.fathers_name || ''} onChange={e => setEditingCustomer({ ...editingCustomer, fathers_name: e.target.value })} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Reference (संदर्भ)</label>
+                <input type="text" className="input-field" value={editingCustomer.reference || ''} onChange={e => setEditingCustomer({ ...editingCustomer, reference: e.target.value })} />
               </div>
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">Customer Type</label>

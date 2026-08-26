@@ -20,6 +20,8 @@ class Customer(Base):
     current_balance = Column(Numeric(12, 2), default=0.00, nullable=False)
     credit_limit = Column(Numeric(12, 2), default=0.00, nullable=False)
     status = Column(String, default="Active", nullable=False)          # "Active", "Inactive"
+    fathers_name = Column(String, nullable=True)
+    reference = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

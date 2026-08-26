@@ -11,6 +11,8 @@ class CustomerBase(BaseModel):
     payment_type: str = Field("Cash", pattern="^(Cash|Monthly Credit|Other)$")
     opening_balance: Decimal = Field(default=Decimal("0.00"))
     credit_limit: Decimal = Field(default=Decimal("0.00"))
+    fathers_name: Optional[str] = None
+    reference: Optional[str] = None
     notes: Optional[str] = None
 
 class CustomerCreate(CustomerBase):
@@ -26,6 +28,8 @@ class CustomerUpdate(BaseModel):
     payment_type: Optional[str] = Field(None, pattern="^(Cash|Monthly Credit|Other)$")
     credit_limit: Optional[Decimal] = None
     status: Optional[str] = Field(None, pattern="^(Active|Inactive)$")
+    fathers_name: Optional[str] = None
+    reference: Optional[str] = None
     notes: Optional[str] = None
     portal_username: Optional[str] = None
     portal_password: Optional[str] = None
@@ -53,6 +57,8 @@ class CustomerImportRow(BaseModel):
     payment_type: str = "Cash"
     opening_balance: Decimal = Decimal("0.00")
     credit_limit: Decimal = Decimal("0.00")
+    fathers_name: Optional[str] = None
+    reference: Optional[str] = None
     notes: Optional[str] = None
     errors: List[str] = []
     warnings: List[str] = []

@@ -57,6 +57,18 @@ def startup_event():
         except Exception:
             db.rollback()
 
+        # Add fathers_name and reference columns if missing
+        try:
+            db.execute(text("ALTER TABLE customers ADD COLUMN fathers_name VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+        try:
+            db.execute(text("ALTER TABLE customers ADD COLUMN reference VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         # Seed initial Live Updates announcement
         from .models.customer import LiveUpdate
         exists_update = db.query(LiveUpdate).first()

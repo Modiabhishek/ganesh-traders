@@ -78,6 +78,8 @@ def create_customer(
         current_balance=customer_in.opening_balance,
         credit_limit=customer_in.credit_limit,
         notes=customer_in.notes,
+        fathers_name=customer_in.fathers_name,
+        reference=customer_in.reference,
         portal_username=customer_in.portal_username,
         portal_password_hash=pw_hash,
         portal_status=customer_in.portal_status or "Blocked"
@@ -164,7 +166,9 @@ def import_confirm(
             opening_balance=r.opening_balance,
             current_balance=r.opening_balance,
             credit_limit=r.credit_limit,
-            notes=r.notes
+            notes=r.notes,
+            fathers_name=r.fathers_name,
+            reference=r.reference
         )
         db.add(new_cust)
         db.commit() # Commit sequentially to generate correct incremental codes

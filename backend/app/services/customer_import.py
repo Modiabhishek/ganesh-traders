@@ -39,6 +39,8 @@ def parse_csv_for_preview(csv_bytes: bytes, db: Session) -> CustomerImportPrevie
         "payment type": "payment_type", "payment": "payment_type", "payment_type": "payment_type",
         "opening balance": "opening_balance", "opening_balance": "opening_balance", "opening due": "opening_balance",
         "credit limit": "credit_limit", "credit_limit": "credit_limit",
+        "fathers name": "fathers_name", "father name": "fathers_name", "fathers_name": "fathers_name", "father_name": "fathers_name",
+        "reference": "reference", "referred by": "reference", "referred_by": "reference",
         "notes": "notes"
     }
 
@@ -51,7 +53,7 @@ def parse_csv_for_preview(csv_bytes: bytes, db: Session) -> CustomerImportPrevie
     df = df.rename(columns=renamed)
 
     # Ensure essential columns exist in the DataFrame
-    for col in ["name", "mobile", "address", "customer_type", "payment_type", "opening_balance", "credit_limit", "notes"]:
+    for col in ["name", "mobile", "address", "customer_type", "payment_type", "opening_balance", "credit_limit", "fathers_name", "reference", "notes"]:
         if col not in df.columns:
             df[col] = None
 
@@ -79,6 +81,8 @@ def parse_csv_for_preview(csv_bytes: bytes, db: Session) -> CustomerImportPrevie
         address = clean_str(r.get("address"))
         cust_type = clean_str(r.get("customer_type")) or "Retail"
         pay_type = clean_str(r.get("payment_type")) or "Cash"
+        fathers_name = clean_str(r.get("fathers_name"))
+        reference = clean_str(r.get("reference"))
         notes = clean_str(r.get("notes"))
 
         try:
@@ -177,6 +181,8 @@ def parse_csv_for_preview(csv_bytes: bytes, db: Session) -> CustomerImportPrevie
             payment_type=pay_type,
             opening_balance=op_bal,
             credit_limit=cr_lim,
+            fathers_name=fathers_name or None,
+            reference=reference or None,
             notes=notes or None,
             errors=errors,
             warnings=warnings,

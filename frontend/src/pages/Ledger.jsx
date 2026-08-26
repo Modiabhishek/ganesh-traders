@@ -143,13 +143,23 @@ const Ledger = ({ customerId, setCurrentPage, goBack }) => {
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Customer Profile</span>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.25rem', marginBottom: '0.5rem' }}>{customer.name}</h2>
+            {customer.fathers_name && (
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                <strong>पिता:</strong> {customer.fathers_name}
+              </p>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
               <Phone size={14} /> {customer.mobile || 'No Phone'}
             </div>
           </div>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Account Reference</span>
-            <p style={{ fontSize: '1.15rem', fontWeight: 600, marginTop: '0.25rem' }}>{customer.customer_code}</p>
+            <p style={{ fontSize: '1.15rem', fontWeight: 600, marginTop: '0.25rem', marginBottom: '0.25rem' }}>{customer.customer_code}</p>
+            {customer.reference && (
+              <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 500, marginBottom: '0.25rem' }}>
+                <strong>संदर्भ:</strong> {customer.reference}
+              </p>
+            )}
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Type: {customer.opening_balance > 0 ? 'Balance carried forward' : 'Regular'}</p>
           </div>
           <div style={{ textAlign: 'right' }}>
