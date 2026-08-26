@@ -104,33 +104,40 @@ function App() {
     try {
       const data = await authAPI.login(username, password);
       
-      // Initialize transition overlays
+      // 1. Mount curtains in open state and slide them closed over the login page
       setShowCurtain(true);
-      setIsCurtainOpening(false);
+      setIsCurtainOpening(true);
       setShowShutter(true);
       setIsShutterOpening(false);
 
-      // Save token
-      localStorage.setItem('token', data.access_token);
-      setToken(data.access_token);
-      
-      // 1. Slide open the curtains after 200ms
+      setTimeout(() => {
+        setIsCurtainOpening(false); // Slide closed
+      }, 50);
+
+      // 2. Once curtains are fully closed (after 1200ms), update the token in state
+      // This will change the page underneath to the main app (displaying the closed shutter behind the curtains)
+      setTimeout(() => {
+        localStorage.setItem('token', data.access_token);
+        setToken(data.access_token);
+      }, 1200);
+
+      // 3. Slide open the curtains to reveal the closed shutter
       setTimeout(() => {
         setIsCurtainOpening(true);
-      }, 200);
+      }, 1500);
 
-      // 2. Start rolling up the shop shutter after 1000ms (as curtains open)
+      // 4. Start rolling up the shop shutter after curtains slide open
       setTimeout(() => {
         setIsShutterOpening(true);
-      }, 1000);
+      }, 2700);
 
-      // 3. Clear all overlays after 2600ms to reveal dashboard
+      // 5. Clear all overlays
       setTimeout(() => {
         setShowCurtain(false);
         setIsCurtainOpening(false);
         setShowShutter(false);
         setIsShutterOpening(false);
-      }, 2600);
+      }, 4000);
 
       setCurrentPage('dashboard');
     } catch (err) {
@@ -196,7 +203,7 @@ function App() {
 
           <form onSubmit={handleLogin}>
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label">Username (लॉगिन आईडी)</label>
+              <label className="form-label">Username</label>
               <input 
                 type="text" 
                 className="input-field" 
@@ -208,7 +215,7 @@ function App() {
             </div>
             
             <div className="form-group" style={{ marginBottom: '1.75rem' }}>
-              <label className="form-label">Password (पासवर्ड)</label>
+              <label className="form-label">Password</label>
               <input 
                 type="password" 
                 className="input-field" 
@@ -220,7 +227,7 @@ function App() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1rem' }} disabled={loading}>
-              <LogIn size={18} /> {loading ? 'Signing in...' : 'Sign In (प्रवेश करें)'}
+              <LogIn size={18} /> {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
@@ -485,6 +492,7 @@ function App() {
       {/* Theater Curtains Opening Animation Overlay */}
       {showCurtain && (
         <div className="theater-curtains-overlay no-print">
+          <div className="curtain-valance" />
           <div className={`curtain-panel left-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
           <div className={`curtain-panel right-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
         </div>
@@ -756,6 +764,18 @@ function App() {
           display: flex;
           z-index: 9999;
           pointer-events: none;
+        }
+
+        .curtain-valance {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 60px;
+          background: linear-gradient(to bottom, #7f1d1d, #991b1b 50%, #7f1d1d 90%, #b45309 100%);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+          z-index: 10000;
+          border-bottom: 4px solid #d97706;
         }
 
         .curtain-panel {
