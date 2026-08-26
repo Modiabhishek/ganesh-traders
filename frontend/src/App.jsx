@@ -84,7 +84,18 @@ function App() {
 
   // Curtain state
   const [showCurtain, setShowCurtain] = useState(false);
-  const [isCurtainOpening, setIsCurtainOpening] = useState(true);
+  const [isCurtainOpening, setIsCurtainOpening] = useState(false);
+
+  // Slide curtains open on initial page load
+  useEffect(() => {
+    if (!token) {
+      setIsCurtainOpening(false);
+      const timer = setTimeout(() => {
+        setIsCurtainOpening(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [token]);
 
   // Sync theme to body element
   useEffect(() => {
