@@ -91,10 +91,16 @@ function App() {
   useEffect(() => {
     if (!token) {
       setIsCurtainOpening(false);
-      const timer = setTimeout(() => {
+      const openTimer = setTimeout(() => {
         setIsCurtainOpening(true);
       }, 500);
-      return () => clearTimeout(timer);
+      const hideTimer = setTimeout(() => {
+        setShowCurtain(false);
+      }, 1700);
+      return () => {
+        clearTimeout(openTimer);
+        clearTimeout(hideTimer);
+      };
     }
   }, [token]);
 
@@ -828,7 +834,7 @@ function App() {
         }
 
         .left-curtain.curtain-open {
-          transform: translateX(-82%);
+          transform: translateX(-100%);
         }
 
         .right-curtain {
@@ -837,7 +843,7 @@ function App() {
         }
 
         .right-curtain.curtain-open {
-          transform: translateX(82%);
+          transform: translateX(100%);
         }
       `}</style>
     </div>
