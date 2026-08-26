@@ -86,6 +86,7 @@ function App() {
   // Curtain state
   const [showCurtain, setShowCurtain] = useState(!hasToken);
   const [isCurtainOpening, setIsCurtainOpening] = useState(false);
+  const [curtainClickable, setCurtainClickable] = useState(false);
 
   // Slide curtains open on initial page load
   useEffect(() => {
@@ -171,11 +172,30 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken('');
-    setCurrentPage('dashboard');
-    setUsername('');
-    setPassword('');
+    // 1. Slide curtains closed over the active dashboard
+    setShowCurtain(true);
+    setIsCurtainOpening(false);
+    
+    setTimeout(() => {
+      // 2. Once curtains are fully closed (after 1200ms), delete token
+      localStorage.removeItem('token');
+      setToken('');
+      setCurrentPage('dashboard');
+      setUsername('');
+      setPassword('');
+      // Make curtains clickable to slide open
+      setCurtainClickable(true);
+    }, 1200);
+  };
+
+  const handleCurtainClick = () => {
+    if (curtainClickable) {
+      setIsCurtainOpening(true);
+      setCurtainClickable(false);
+      setTimeout(() => {
+        setShowCurtain(false);
+      }, 1200);
+    }
   };
 
 
@@ -511,8 +531,20 @@ function App() {
 
       {/* Theater Curtains Opening Animation Overlay */}
       {showCurtain && (
-        <div className="theater-curtains-overlay no-print">
+        <div 
+          className={`theater-curtains-overlay no-print ${curtainClickable ? 'clickable' : ''}`}
+          onClick={handleCurtainClick}
+          style={{ cursor: curtainClickable ? 'pointer' : 'default' }}
+        >
           <div className="curtain-valance" />
+          {curtainClickable && (
+            <div className="curtain-welcome-text">
+              ।। श्री श्याम देवाय नमः ।।<br />
+              <span style={{ fontSize: '1.25rem', fontWeight: 700, display: 'block', marginTop: '0.5rem', color: '#fbbf24' }}>
+                गणेश ट्रेडर्स में आपका स्वागत है (खोलने के लिए क्लिक करें)
+              </span>
+            </div>
+          )}
           <div className={`curtain-panel left-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
           <div className={`curtain-panel right-curtain ${isCurtainOpening ? 'curtain-open' : ''}`} />
         </div>
@@ -844,6 +876,28 @@ function App() {
 
         .right-curtain.curtain-open {
           transform: translateX(100%);
+        }
+
+        .curtain-welcome-text {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          color: #fbbf24;
+          font-size: 1.65rem;
+          font-weight: 800;
+          text-align: center;
+          z-index: 10001;
+          text-shadow: 0 4px 12px rgba(0,0,0,0.9);
+          animation: pulse 2s infinite;
+          pointer-events: none;
+          width: 90%;
+        }
+
+        @keyframes pulse {
+          0% { transform: translate(-50%, -50%) scale(0.98); opacity: 0.95; }
+          50% { transform: translate(-50%, -50%) scale(1.02); opacity: 1; text-shadow: 0 4px 20px rgba(251, 191, 36, 0.4); }
+          100% { transform: translate(-50%, -50%) scale(0.98); opacity: 0.95; }
         }
       `}</style>
     </div>
