@@ -15,25 +15,11 @@ const parseNaiveDate = (dateStr) => {
   if (!dateStr) return new Date();
   if (dateStr instanceof Date) return dateStr;
   try {
-    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
     let workingStr = dateStr;
-    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
+    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
       workingStr = dateStr + 'Z';
     }
-
-    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
-      return new Date(workingStr);
-    }
-    const parts = workingStr.replace('T', ' ').split(' ');
-    const dateParts = parts[0].split('-');
-    const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
-    return new Date(
-      parseInt(dateParts[0], 10),
-      parseInt(dateParts[1], 10) - 1,
-      parseInt(dateParts[2], 10),
-      parseInt(timeParts[0], 10),
-      parseInt(timeParts[1], 10)
-    );
+    return new Date(workingStr);
   } catch (e) {
     return new Date(dateStr);
   }

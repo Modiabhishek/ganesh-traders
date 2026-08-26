@@ -13,7 +13,7 @@ import StaffManager from './pages/StaffManager';
 import ExpenseManager from './pages/ExpenseManager';
 import CustomerPortal from './pages/CustomerPortal';
 import AnnouncementManager from './pages/AnnouncementManager';
-import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout, Bell } from 'lucide-react';
+import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout, Bell, Menu, X } from 'lucide-react';
 
 const decodeToken = (token) => {
   if (!token) return null;
@@ -34,6 +34,13 @@ function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectCustomerId, setSelectCustomerId] = useState(null);
   const [pageHistory, setPageHistory] = useState(['dashboard']);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+
+  useEffect(() => {
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
+  }, [currentPage]);
 
   const navigateTo = (page) => {
     setPageHistory(prev => {
@@ -240,13 +247,33 @@ function App() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="sidebar-container" style={{ display: 'flex', minHeight: '100vh' }}>
       
+      {/* Mobile Top Header (Show only on phone view) */}
+      <header className="mobile-header no-print">
+        <button className="menu-toggle-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <Menu size={24} />
+        </button>
+        <span className="mobile-title">गणेश ट्रेडर्स</span>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>।। श्री गणेशाय नमः ।।</div>
+      </header>
+
+      {/* Sidebar overlay to close sidebar when clicking outside on mobile */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Navigation Sidebar (Hidden during browser Print) */}
-      <aside className="no-print" style={{ width: '260px', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem' }}>
-        <div style={{ marginBottom: '2.5rem', paddingLeft: '0.5rem' }}>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Ganesh Traders</h2>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>v1.0 Go-Live Ready</span>
+      <aside className={`app-sidebar no-print ${sidebarOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', paddingLeft: '0.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Ganesh Traders</h2>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>v1.0 Go-Live Ready</span>
+          </div>
+          {/* Close button inside sidebar on mobile */}
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
@@ -352,7 +379,7 @@ function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, overflowY: 'auto' }}>
+      <main className="app-main-content" style={{ flex: 1, overflowY: 'auto' }}>
         {renderPage()}
       </main>
 
@@ -504,6 +531,114 @@ function App() {
           `}</style>
         </div>
       )}
+      <style>{`
+        .sidebar-container {
+          display: flex;
+          min-height: 100vh;
+          position: relative;
+          width: 100%;
+        }
+
+        .mobile-header {
+          display: none;
+        }
+
+        .sidebar-close-btn {
+          display: none;
+        }
+
+        .app-sidebar {
+          width: 260px;
+          background: var(--bg-secondary);
+          border-right: 1px solid var(--border-color);
+          display: flex;
+          flex-direction: column;
+          padding: 1.5rem 1rem;
+          flex-shrink: 0;
+        }
+
+        .app-main-content {
+          flex: 1;
+          overflow-y: auto;
+          width: 100%;
+          padding: 2rem;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 1rem;
+            z-index: 998;
+          }
+
+          .menu-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+          }
+
+          .mobile-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+          }
+
+          .sidebar-close-btn {
+            display: flex;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.25rem;
+          }
+
+          .app-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.15);
+            width: 260px;
+          }
+
+          .app-sidebar.open {
+            transform: translateX(0);
+          }
+
+          .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 999;
+            backdrop-filter: blur(2px);
+          }
+
+          .app-main-content {
+            padding: 1rem;
+            padding-top: 72px; /* Space for fixed mobile header */
+          }
+        }
+      `}</style>
     </div>
   );
 }
