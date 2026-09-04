@@ -40,6 +40,24 @@ def startup_event():
         db.execute(text("UPDATE users SET status = 'Active' WHERE status IS NULL OR status = ''"))
         db.commit()
 
+        # Auto-enable Row Level Security (RLS) on all public tables for PostgreSQL (Supabase)
+        if engine.dialect.name == "postgresql":
+            try:
+                db.execute(text("""
+                    DO $$
+                    DECLARE
+                        r RECORD;
+                    BEGIN
+                        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                            EXECUTE 'ALTER TABLE public."' || r.tablename || '" ENABLE ROW LEVEL SECURITY;';
+                        END LOOP;
+                    END $$;
+                """))
+                db.commit()
+            except Exception as e:
+                print("Failed to auto-enable RLS on PostgreSQL:", e)
+                db.rollback()
+
         # Customer portal database migrations
         try:
             db.execute(text("ALTER TABLE customers ADD COLUMN portal_username VARCHAR"))
