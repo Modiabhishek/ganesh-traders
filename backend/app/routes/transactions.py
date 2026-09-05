@@ -16,15 +16,38 @@ from ..schemas.transaction import (
 from ..dependencies.auth import get_current_user
 from ..models.user import User
 
+from ..models.bill import Bill
+from ..utils.sequence import reset_table_sequence, sync_financial_year_counters
+
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 def generate_sale_number(db: Session) -> str:
-    count = db.query(Sale).count()
-    return f"SALE-{count + 1:05d}"
+    existing = db.query(Sale.sale_number).filter(Sale.sale_number.like("SALE-%")).all()
+    used_numbers = set()
+    for (num_str,) in existing:
+        try:
+            part = num_str.split("-")[1]
+            used_numbers.add(int(part))
+        except (IndexError, ValueError):
+            pass
+    next_num = 1
+    while next_num in used_numbers:
+        next_num += 1
+    return f"SALE-{next_num:05d}"
 
 def generate_payment_number(db: Session) -> str:
-    count = db.query(CustomerPayment).count()
-    return f"PMT-{count + 1:05d}"
+    existing = db.query(CustomerPayment.payment_number).filter(CustomerPayment.payment_number.like("PMT-%")).all()
+    used_numbers = set()
+    for (num_str,) in existing:
+        try:
+            part = num_str.split("-")[1]
+            used_numbers.add(int(part))
+        except (IndexError, ValueError):
+            pass
+    next_num = 1
+    while next_num in used_numbers:
+        next_num += 1
+    return f"PMT-{next_num:05d}"
 
 from ..services.customer_sync import sync_customer_sales_and_payments
 
@@ -196,6 +219,65 @@ def list_payments(
         query = query.filter(CustomerPayment.customer_id == customer_id)
     return query.order_by(CustomerPayment.payment_date.desc()).all()
 
+def permanently_delete_sale_record(sale_id: int, db: Session, reason: Optional[str] = None):
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale transaction not found.")
+
+    sale_number = sale.sale_number
+    customer_id = sale.customer_id
+
+    # 1. Restore product inventory stock if the sale was Active
+    if sale.status == "Active":
+        for item in sale.items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if product:
+                product.current_stock += item.quantity
+
+    # 2. Check if this sale is linked to a POS Bill (bill_no == sale_number)
+    matching_bill = db.query(Bill).filter(Bill.bill_no == sale_number).first()
+    if matching_bill:
+        db.query(StockMovement).filter(
+            StockMovement.reference_id == matching_bill.id,
+            StockMovement.reference_type == "Bill"
+        ).delete(synchronize_session=False)
+        db.delete(matching_bill)
+
+    # 3. Delete StockMovement referencing this Sale
+    db.query(StockMovement).filter(
+        StockMovement.reference_id == sale.id,
+        StockMovement.reference_type == "Sale"
+    ).delete(synchronize_session=False)
+
+    # 4. Permanently delete the Sale (SaleItem will cascade delete)
+    db.delete(sale)
+    db.flush()
+
+    # 5. Re-sync customer ledger balance and FIFO payments
+    if customer_id:
+        sync_customer_sales_and_payments(customer_id, db)
+
+    # 6. Reset database sequences so internal IDs are cleaned
+    reset_table_sequence(db, "sales")
+    reset_table_sequence(db, "bills")
+    reset_table_sequence(db, "sale_items")
+    reset_table_sequence(db, "bill_items")
+    reset_table_sequence(db, "bill_payments")
+
+    # 7. Re-sync FinancialYearCounter
+    sync_financial_year_counters(db)
+
+    db.commit()
+    return {"message": f"Sale {sale_number} permanently deleted and Sale ID freed for reuse."}
+
+@router.delete("/sales/{sale_id}", status_code=status.HTTP_200_OK)
+def delete_sale(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return permanently_delete_sale_record(sale_id, db)
+
 @router.post("/sales/{sale_id}/cancel")
 def cancel_sale(
     sale_id: int,
@@ -203,33 +285,7 @@ def cancel_sale(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    sale = db.query(Sale).filter(Sale.id == sale_id, Sale.status == "Active").first()
-    if not sale:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale transaction not found.")
-
-    sale.status = "Cancelled"
-    sale.cancelled_reason = cancelled_reason or "Cancelled by user"
-
-    for item in sale.items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if product:
-            product.current_stock += item.quantity
-            
-            movement = StockMovement(
-                product_id=product.id,
-                movement_type="CANCEL_SALE",
-                quantity=item.quantity,
-                reference_id=sale.id,
-                reference_type="Sale",
-                notes=f"Sale voided: {sale.sale_number}"
-            )
-            db.add(movement)
-
-    if sale.customer_id:
-        sync_customer_sales_and_payments(sale.customer_id, db)
-
-    db.commit()
-    return {"message": f"Sale {sale.sale_number} cancelled and reversed successfully."}
+    return permanently_delete_sale_record(sale_id, db, cancelled_reason)
 
 @router.put("/sales/{sale_id}", response_model=SaleResponse)
 def update_sale(
@@ -270,23 +326,40 @@ def update_sale(
     db.refresh(sale)
     return sale
 
+def permanently_delete_payment_record(payment_id: int, db: Session):
+    payment = db.query(CustomerPayment).filter(CustomerPayment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment transaction not found.")
+
+    payment_number = payment.payment_number
+    customer_id = payment.customer_id
+
+    db.delete(payment)
+    db.flush()
+
+    if customer_id:
+        sync_customer_sales_and_payments(customer_id, db)
+
+    reset_table_sequence(db, "customer_payments")
+
+    db.commit()
+    return {"message": f"Payment {payment_number} permanently deleted and Payment ID freed for reuse."}
+
+@router.delete("/payments/{payment_id}", status_code=status.HTTP_200_OK)
+def delete_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return permanently_delete_payment_record(payment_id, db)
+
 @router.post("/payments/{payment_id}/cancel")
 def cancel_payment(
     payment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    payment = db.query(CustomerPayment).filter(CustomerPayment.id == payment_id, CustomerPayment.status == "Active").first()
-    if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment transaction not found.")
-
-    payment.status = "Cancelled"
-
-    if payment.customer_id:
-        sync_customer_sales_and_payments(payment.customer_id, db)
-
-    db.commit()
-    return {"message": f"Payment {payment.payment_number} cancelled and reversed successfully."}
+    return permanently_delete_payment_record(payment_id, db)
 
 @router.put("/payments/{payment_id}", response_model=CustomerPaymentResponse)
 def update_payment(

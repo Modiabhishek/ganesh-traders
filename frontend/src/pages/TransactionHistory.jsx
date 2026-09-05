@@ -52,32 +52,33 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
   }, [tab]);
 
   const handleVoidSale = async (sale) => {
-    const reason = window.prompt(`Are you sure you want to void sale '${sale.sale_number}'? This will restore inventory stock and reduce this customer's dues balance. Please enter a reason:`);
-    if (reason === null) return; // cancelled prompt
+    if (!window.confirm(`Are you sure you want to permanently delete sale '${sale.sale_number}'?\n\n• Restores product stock to inventory\n• Recalculates customer balance\n• Frees up '${sale.sale_number}' for immediate reuse on next bill`)) {
+      return;
+    }
     
     setMessage({ text: '', type: '' });
     try {
-      await transactionAPI.cancelSale(sale.id, reason || 'Voided by user');
-      setMessage({ text: `Sale '${sale.sale_number}' has been successfully voided and reversed.`, type: 'success' });
+      await transactionAPI.deleteSale(sale.id);
+      setMessage({ text: `Sale '${sale.sale_number}' permanently deleted. Sale ID is now freed for reuse.`, type: 'success' });
       loadTransactions();
     } catch (err) {
       console.error(err);
-      setMessage({ text: 'Failed to void sale invoice.', type: 'danger' });
+      setMessage({ text: 'Failed to delete sale invoice.', type: 'danger' });
     }
   };
 
   const handleVoidPayment = async (pay) => {
-    if (!window.confirm(`Are you sure you want to void payment '${pay.payment_number}'? This will add the paid amount of ₹${pay.amount} back to the customer's outstanding balance.`)) {
+    if (!window.confirm(`Are you sure you want to permanently delete payment '${pay.payment_number}'?\n\n• Restores customer outstanding dues\n• Frees up '${pay.payment_number}' for reuse`)) {
       return;
     }
     setMessage({ text: '', type: '' });
     try {
-      await transactionAPI.cancelPayment(pay.id);
-      setMessage({ text: `Payment '${pay.payment_number}' voided successfully. Customer balance restored.`, type: 'success' });
+      await transactionAPI.deletePayment(pay.id);
+      setMessage({ text: `Payment '${pay.payment_number}' permanently deleted. Receipt ID freed for reuse.`, type: 'success' });
       loadTransactions();
     } catch (err) {
       console.error(err);
-      setMessage({ text: 'Failed to void payment record.', type: 'danger' });
+      setMessage({ text: 'Failed to delete payment record.', type: 'danger' });
     }
   };
 
@@ -295,7 +296,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                         <button 
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '0.4rem', color: 'var(--danger)' }}
-                          title="Void Sale"
+                          title="Permanently Delete Sale (Frees Sale ID)"
                           onClick={() => handleVoidSale(s)}
                         >
                           <Trash2 size={14} />
@@ -364,7 +365,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                         <button 
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '0.4rem', color: 'var(--danger)' }}
-                          title="Void Payment Collection"
+                          title="Permanently Delete Payment (Frees Receipt ID)"
                           onClick={() => handleVoidPayment(p)}
                         >
                           <Trash2 size={14} />

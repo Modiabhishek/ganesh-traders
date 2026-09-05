@@ -21,13 +21,15 @@ from ..services.billing_calculator import (
 )
 from ..services.customer_sync import sync_customer_sales_and_payments
 from ..dependencies.auth import get_current_user
+from ..utils.sequence import reset_table_sequence, sync_financial_year_counters
 
 router = APIRouter(prefix="/bills", tags=["bills"])
 
 def get_next_bill_number(db: Session, date: Optional[datetime] = None) -> tuple[str, str]:
     """
     Generates a gapless, sequential GST-compliant bill number per Indian Financial Year (Apr 1 - Mar 31).
-    Format: GT/26-27/0001
+    Format: GT/26-27/0001.
+    Reuses deleted bill numbers / fills gaps, and restarts at 0001 if all bills are deleted.
     """
     if date is None:
         date = get_ist_naive()
@@ -41,21 +43,33 @@ def get_next_bill_number(db: Session, date: Optional[datetime] = None) -> tuple[
         fy = f"{year-1}-{year}"
         short_fy = f"{str(year-1)[-2:]}-{str(year)[-2:]}"
 
+    existing_bills = db.query(Bill.bill_no).filter(Bill.bill_no.like(f"GT/{short_fy}/%")).all()
+    used_numbers = set()
+    for (b_no,) in existing_bills:
+        try:
+            part = b_no.split("/")[-1]
+            used_numbers.add(int(part))
+        except (IndexError, ValueError):
+            pass
+
+    next_num = 1
+    while next_num in used_numbers:
+        next_num += 1
+
+    max_used = max(used_numbers) if used_numbers else 0
     try:
         counter = db.query(FinancialYearCounter).filter(FinancialYearCounter.financial_year == fy).with_for_update().first()
     except Exception:
         counter = db.query(FinancialYearCounter).filter(FinancialYearCounter.financial_year == fy).first()
 
     if not counter:
-        counter = FinancialYearCounter(financial_year=fy, last_number=1)
+        counter = FinancialYearCounter(financial_year=fy, last_number=max(max_used, next_num))
         db.add(counter)
-        db.flush()
-        num = 1
     else:
-        counter.last_number += 1
-        num = counter.last_number
+        counter.last_number = max(max_used, next_num)
+    db.flush()
 
-    bill_no = f"GT/{short_fy}/{num:04d}"
+    bill_no = f"GT/{short_fy}/{next_num:04d}"
     return bill_no, fy
 
 @router.post("/calculate")
@@ -447,6 +461,68 @@ def get_bill(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
     return format_bill_response(bill)
 
+def permanently_delete_bill_record(bill_id: int, db: Session, reason: Optional[str] = None):
+    bill = db.query(Bill).filter(Bill.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+
+    bill_no = bill.bill_no
+    customer_id = bill.customer_id
+
+    # 1. Reverse inventory if bill was Active
+    if bill.status == "Active":
+        for item in bill.items:
+            if item.product_id:
+                prod = db.query(Product).filter(Product.id == item.product_id).first()
+                if prod:
+                    prod.current_stock += item.qty
+
+    # 2. Delete StockMovement referencing this Bill
+    db.query(StockMovement).filter(
+        StockMovement.reference_id == bill.id,
+        StockMovement.reference_type == "Bill"
+    ).delete(synchronize_session=False)
+
+    # 3. Check if matching Sale exists and delete it
+    matching_sale = db.query(Sale).filter(Sale.sale_number == bill_no).first()
+    if matching_sale:
+        db.query(StockMovement).filter(
+            StockMovement.reference_id == matching_sale.id,
+            StockMovement.reference_type == "Sale"
+        ).delete(synchronize_session=False)
+        db.delete(matching_sale)
+
+    # 4. Permanently delete Bill (BillItem & BillPayment cascade delete)
+    db.delete(bill)
+    db.flush()
+
+    # 5. Re-sync customer balance & FIFO payments
+    if customer_id:
+        sync_customer_sales_and_payments(customer_id, db)
+
+    # 6. Reset sequences
+    reset_table_sequence(db, "bills")
+    reset_table_sequence(db, "sales")
+    reset_table_sequence(db, "bill_items")
+    reset_table_sequence(db, "sale_items")
+    reset_table_sequence(db, "bill_payments")
+
+    # 7. Re-sync FinancialYearCounter
+    sync_financial_year_counters(db)
+
+    db.commit()
+    return {"message": f"Bill {bill_no} permanently deleted and Bill ID freed for reuse."}
+
+@router.delete("/{bill_id}", status_code=status.HTTP_200_OK)
+def delete_bill(
+    bill_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role not in ["Admin", "Staff"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+    return permanently_delete_bill_record(bill_id, db)
+
 @router.post("/{bill_id}/void")
 def void_bill(
     bill_id: int,
@@ -456,38 +532,4 @@ def void_bill(
 ):
     if current_user.role not in ["Admin", "Staff"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
-
-    bill = db.query(Bill).filter(Bill.id == bill_id, Bill.status == "Active").first()
-    if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active bill not found.")
-
-    bill.status = "Cancelled"
-    bill.cancelled_reason = reason or "Voided by user"
-
-    # Reverse inventory
-    for item in bill.items:
-        if item.product_id:
-            prod = db.query(Product).filter(Product.id == item.product_id).first()
-            if prod:
-                prod.current_stock += item.qty
-                movement = StockMovement(
-                    product_id=prod.id,
-                    movement_type="CANCEL_SALE",
-                    quantity=item.qty,
-                    reference_id=bill.id,
-                    reference_type="Bill",
-                    notes=f"Bill voided: {bill.bill_no}"
-                )
-                db.add(movement)
-
-    # Cancel matching Sale
-    matching_sale = db.query(Sale).filter(Sale.sale_number == bill.bill_no, Sale.status == "Active").first()
-    if matching_sale:
-        matching_sale.status = "Cancelled"
-        matching_sale.cancelled_reason = reason or "Voided with bill"
-
-    if bill.customer_id:
-        sync_customer_sales_and_payments(bill.customer_id, db)
-
-    db.commit()
-    return {"message": f"Bill {bill.bill_no} voided and reversed successfully."}
+    return permanently_delete_bill_record(bill_id, db, reason)

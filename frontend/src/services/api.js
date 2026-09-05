@@ -208,6 +208,10 @@ export const billAPI = {
       params: { reason }
     });
     return response.data;
+  },
+  deleteBill: async (id) => {
+    const response = await api.delete(`/bills/${id}`);
+    return response.data;
   }
 };
 
@@ -238,12 +242,20 @@ export const transactionAPI = {
     });
     return response.data;
   },
+  deleteSale: async (id) => {
+    const response = await api.delete(`/transactions/sales/${id}`);
+    return response.data;
+  },
   updateSale: async (id, saleData) => {
     const response = await api.put(`/transactions/sales/${id}`, saleData);
     return response.data;
   },
   cancelPayment: async (id) => {
     const response = await api.post(`/transactions/payments/${id}/cancel`);
+    return response.data;
+  },
+  deletePayment: async (id) => {
+    const response = await api.delete(`/transactions/payments/${id}`);
     return response.data;
   },
   updatePayment: async (id, paymentData) => {

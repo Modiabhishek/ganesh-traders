@@ -206,6 +206,50 @@ def startup_event():
             db.rollback()
             print("Startup: Customer synchronization warning:", e)
 
+        # 9. Clean up legacy cancelled records to free up sale/bill IDs and sync sequences
+        try:
+            from .models.transaction import Sale, CustomerPayment
+            from .models.bill import Bill
+            from .models.inventory import StockMovement
+            from .utils.sequence import reset_table_sequence, sync_financial_year_counters
+
+            # Delete cancelled sales and bills
+            cancelled_sales = db.query(Sale).filter(Sale.status == "Cancelled").all()
+            for cs in cancelled_sales:
+                db.query(StockMovement).filter(
+                    StockMovement.reference_id == cs.id,
+                    StockMovement.reference_type == "Sale"
+                ).delete(synchronize_session=False)
+                db.delete(cs)
+
+            cancelled_bills = db.query(Bill).filter(Bill.status == "Cancelled").all()
+            for cb in cancelled_bills:
+                db.query(StockMovement).filter(
+                    StockMovement.reference_id == cb.id,
+                    StockMovement.reference_type == "Bill"
+                ).delete(synchronize_session=False)
+                db.delete(cb)
+
+            cancelled_payments = db.query(CustomerPayment).filter(CustomerPayment.status == "Cancelled").all()
+            for cp in cancelled_payments:
+                db.delete(cp)
+
+            db.commit()
+
+            # Sync FY counters and reset table sequences
+            sync_financial_year_counters(db)
+            reset_table_sequence(db, "sales")
+            reset_table_sequence(db, "bills")
+            reset_table_sequence(db, "sale_items")
+            reset_table_sequence(db, "bill_items")
+            reset_table_sequence(db, "bill_payments")
+            reset_table_sequence(db, "customer_payments")
+            db.commit()
+            print("Startup: Cleaned up legacy cancelled transactions and synced sequences.")
+        except Exception as e:
+            db.rollback()
+            print("Startup: Legacy cancelled transactions cleanup warning:", e)
+
     except Exception as e:
         print("Startup: Unexpected error during startup:", e)
     finally:

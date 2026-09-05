@@ -270,6 +270,19 @@ const POS = ({ setCurrentPage, goBack }) => {
     setShowReceiptModal(true);
   };
 
+  const handleDeleteRecentSale = async (sale) => {
+    if (!window.confirm(`Are you sure you want to permanently delete sale '${sale.sale_number}'?\n\n• Restores product stock to inventory\n• Recalculates customer balance\n• Frees up '${sale.sale_number}' for immediate reuse on your next bill`)) {
+      return;
+    }
+    try {
+      await transactionAPI.deleteSale(sale.id);
+      await refreshStockAndSales();
+    } catch (err) {
+      console.error('Failed to delete sale:', err);
+      alert('Failed to delete sale invoice.');
+    }
+  };
+
   // Compute today's sales and revenues in Indian Standard Time (IST)
   const todayISTStr = formatISTDate(new Date());
   const todaySales = recentSales.filter(s => {
@@ -1367,7 +1380,7 @@ const POS = ({ setCurrentPage, goBack }) => {
                               {sale.payment_method}
                             </span>
                           </td>
-                          <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
@@ -1379,6 +1392,15 @@ const POS = ({ setCurrentPage, goBack }) => {
                               title="Reprint Receipt"
                             >
                               <Printer size={13} /> Reprint
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '0.25rem 0.45rem', color: 'var(--danger)' }}
+                              onClick={() => handleDeleteRecentSale(sale)}
+                              title="Permanently Delete (Frees Sale ID)"
+                            >
+                              <Trash2 size={13} />
                             </button>
                           </td>
                         </tr>
