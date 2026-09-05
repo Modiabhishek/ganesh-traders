@@ -11,10 +11,17 @@ if db_url.startswith("postgres://"):
 
 if db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+elif db_url.startswith("postgresql"):
+    connect_args = {
+        "connect_timeout": 10,
+        "options": "-c statement_timeout=20000 -c lock_timeout=5000"
+    }
 
 engine = create_engine(
     db_url,
-    connect_args=connect_args
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
