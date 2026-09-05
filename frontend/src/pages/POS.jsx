@@ -3,7 +3,8 @@ import { productAPI, customerAPI, transactionAPI } from '../services/api';
 import { 
   ArrowLeft, Search, Barcode, ShoppingCart, Trash2, Plus, Minus, 
   Printer, CheckCircle2, AlertCircle, X, CreditCard, Banknote, 
-  QrCode, User, RefreshCw, Volume2, VolumeX, Sparkles 
+  QrCode, User, RefreshCw, Volume2, VolumeX, Sparkles, History,
+  FileText, ExternalLink
 } from 'lucide-react';
 
 const POS = ({ setCurrentPage, goBack }) => {
@@ -40,6 +41,10 @@ const POS = ({ setCurrentPage, goBack }) => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState({ text: '', type: '' });
+
+  // Transactions & Sales Integration state
+  const [recentSales, setRecentSales] = useState([]);
+  const [showRecentSalesModal, setShowRecentSalesModal] = useState(false);
 
   // Web Audio API beep
   const playAudio = (type = 'beep') => {
@@ -78,27 +83,86 @@ const POS = ({ setCurrentPage, goBack }) => {
     }
   };
 
-  // Load catalog & customers
+  // Load catalog, customers & sales transactions
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [cats, prods, custs, sales] = await Promise.all([
+        productAPI.getCategories(),
+        productAPI.getProducts(),
+        customerAPI.getCustomers(),
+        transactionAPI.getSales()
+      ]);
+      setCategories(cats || []);
+      setProducts(prods || []);
+      setCustomers(custs || []);
+      setRecentSales(sales || []);
+    } catch (err) {
+      console.error('POS failed to load data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const initData = async () => {
-      setLoading(true);
-      try {
-        const [cats, prods, custs] = await Promise.all([
-          productAPI.getCategories(),
-          productAPI.getProducts(),
-          customerAPI.getCustomers()
-        ]);
-        setCategories(cats || []);
-        setProducts(prods || []);
-        setCustomers(custs || []);
-      } catch (err) {
-        console.error('POS failed to load catalog:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    initData();
+    loadData();
   }, []);
+
+  const refreshSalesAndStock = async () => {
+    try {
+      const [prods, custs, sales] = await Promise.all([
+        productAPI.getProducts(),
+        customerAPI.getCustomers(),
+        transactionAPI.getSales()
+      ]);
+      setProducts(prods || []);
+      setCustomers(custs || []);
+      setRecentSales(sales || []);
+    } catch (e) {
+      console.error('Failed to refresh stock & sales:', e);
+    }
+  };
+
+  const handleReprintFromHistory = (sale) => {
+    const saleReceipt = {
+      id: sale.id,
+      invoice_number: sale.sale_number,
+      created_at: sale.sale_date,
+      customer_name: sale.customer_name || (sale.customer_id ? `Customer #${sale.customer_id}` : 'Walk-in Customer (नकद ग्राहक)'),
+      customer_mobile: null,
+      items: (sale.items || []).map(it => ({
+        product_id: it.product_id,
+        name: it.product_name || `Item #${it.product_id}`,
+        quantity: parseFloat(it.quantity),
+        price: parseFloat(it.price),
+        unit: it.unit || 'unit'
+      })),
+      subtotal: parseFloat(sale.subtotal) || parseFloat(sale.total_amount),
+      discount: parseFloat(sale.discount) || 0,
+      grand_total: parseFloat(sale.total_amount),
+      payment_mode: sale.payment_method,
+      tender_amount: parseFloat(sale.paid_amount) || parseFloat(sale.total_amount),
+      change_due: 0
+    };
+    setCompletedSale(saleReceipt);
+    setShowReceiptModal(true);
+  };
+
+  // Compute today's sales and revenues
+  const todayStr = new Date().toDateString();
+  const todaySales = recentSales.filter(s => {
+    try {
+      const dateStr = s.sale_date;
+      const d = dateStr ? (dateStr.includes('Z') || dateStr.includes('+') ? new Date(dateStr) : new Date(dateStr + 'Z')) : new Date();
+      return s.status === 'Active' && d.toDateString() === todayStr;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const todayTotalRevenue = todaySales.reduce((acc, s) => acc + (parseFloat(s.total_amount) || 0), 0);
+  const todayCashRevenue = todaySales.filter(s => s.payment_method === 'Cash').reduce((acc, s) => acc + (parseFloat(s.paid_amount) || 0), 0);
+  const todayUpiRevenue = todaySales.filter(s => s.payment_method === 'UPI').reduce((acc, s) => acc + (parseFloat(s.paid_amount) || 0), 0);
 
   // Keep scanner input focused
   useEffect(() => {
@@ -253,8 +317,9 @@ const POS = ({ setCurrentPage, goBack }) => {
     try {
       const itemsPayload = cart.map(item => ({
         product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.price
+        quantity: parseFloat(item.quantity),
+        price: parseFloat(item.price),
+        unit_price: parseFloat(item.price)
       }));
 
       const paidVal = paymentMode === 'Credit' ? 0.00 : (tenderVal > 0 ? Math.min(tenderVal, grandTotal) : grandTotal);
@@ -264,8 +329,9 @@ const POS = ({ setCurrentPage, goBack }) => {
         items: itemsPayload,
         discount: discountAmount,
         paid_amount: paidVal,
+        payment_method: paymentMode,
         payment_mode: paymentMode,
-        notes: `POS Terminal Sale ${selectedCustomer ? '' : '(Walk-in)'}`
+        notes: `POS Terminal Sale ${selectedCustomer ? `(${selectedCustomer.name})` : '(Walk-in)'}`
       };
 
       const result = await transactionAPI.createSale(saleData);
@@ -275,8 +341,8 @@ const POS = ({ setCurrentPage, goBack }) => {
       // Prepare completed sale object for printable receipt
       const saleReceipt = {
         id: result.id,
-        invoice_number: result.invoice_number || `INV-${Date.now().toString().slice(-6)}`,
-        created_at: new Date().toISOString(),
+        invoice_number: result.sale_number || `SALE-${result.id || Date.now().toString().slice(-6)}`,
+        created_at: result.sale_date || new Date().toISOString(),
         customer_name: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer (नकद ग्राहक)',
         customer_mobile: selectedCustomer ? selectedCustomer.mobile : null,
         items: [...cart],
@@ -300,6 +366,9 @@ const POS = ({ setCurrentPage, goBack }) => {
       if (scanInputRef.current) {
         scanInputRef.current.focus();
       }
+
+      // Automatically refresh transactions and stock
+      refreshSalesAndStock();
     } catch (err) {
       console.error('Checkout failed:', err);
       playAudio('error');
@@ -348,6 +417,17 @@ const POS = ({ setCurrentPage, goBack }) => {
 
         {/* Audio Toggle & Quick Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            onClick={() => setShowRecentSalesModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.4rem 0.75rem', fontWeight: 600, borderColor: 'rgba(59, 130, 246, 0.4)', background: 'rgba(59, 130, 246, 0.08)' }}
+            title="View today's sales transactions and reprint receipts"
+          >
+            <History size={16} color="var(--primary)" />
+            <span>Today's Bills: <strong style={{ color: 'var(--primary)' }}>{todaySales.length}</strong> (₹{todayTotalRevenue.toFixed(0)})</span>
+          </button>
+
           <button 
             type="button" 
             className="btn btn-secondary" 
@@ -892,6 +972,152 @@ const POS = ({ setCurrentPage, goBack }) => {
                 <Printer size={16} /> Print Receipt
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent POS Sales & Transaction History Drawer Modal */}
+      {showRecentSalesModal && (
+        <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ background: 'var(--bg-primary)', borderRadius: '16px', maxWidth: '820px', width: '100%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+            
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <History size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>POS Transactions & Today's Sales</h3>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Live sales audit, collections & receipt reprints</span>
+                </div>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setShowRecentSalesModal(false)} style={{ padding: '0.35rem', borderRadius: '50%' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Daily Metrics Row */}
+            <div style={{ padding: '1rem 1.5rem', background: 'var(--bg-secondary)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Sales Today</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>₹{todayTotalRevenue.toFixed(2)}</div>
+              </div>
+              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cash In Drawer</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981' }}>₹{todayCashRevenue.toFixed(2)}</div>
+              </div>
+              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>UPI Collections</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#3b82f6' }}>₹{todayUpiRevenue.toFixed(2)}</div>
+              </div>
+              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Bills</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{todaySales.length}</div>
+              </div>
+            </div>
+
+            {/* Sales Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
+              {recentSales.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  No transactions recorded yet. Complete a sale at the POS counter to see it here.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '0.5rem' }}>Invoice #</th>
+                      <th style={{ padding: '0.5rem' }}>Date & Time</th>
+                      <th style={{ padding: '0.5rem' }}>Customer</th>
+                      <th style={{ padding: '0.5rem' }}>Items</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Mode</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentSales.slice(0, 30).map((sale) => {
+                      const d = sale.sale_date ? (sale.sale_date.includes('Z') || sale.sale_date.includes('+') ? new Date(sale.sale_date) : new Date(sale.sale_date + 'Z')) : new Date();
+                      const saleTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const saleDate = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+                      return (
+                        <tr key={sale.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>
+                            <code style={{ color: 'var(--primary)' }}>{sale.sale_number}</code>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            {saleDate} {saleTime}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem' }}>
+                            <div style={{ fontWeight: 600 }}>{sale.customer_name || 'Walk-in'}</div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {sale.items ? `${sale.items.length} items` : '-'}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 700 }}>
+                            ₹{parseFloat(sale.total_amount).toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600,
+                              background: sale.payment_method === 'Cash' ? 'rgba(16, 185, 129, 0.15)' : (sale.payment_method === 'UPI' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+                              color: sale.payment_method === 'Cash' ? '#10b981' : (sale.payment_method === 'UPI' ? '#3b82f6' : '#ef4444')
+                            }}>
+                              {sale.payment_method}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => {
+                                handleReprintFromHistory(sale);
+                                setShowRecentSalesModal(false);
+                              }}
+                              title="Reprint Receipt"
+                            >
+                              <Printer size={13} /> Reprint
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '0.85rem 1.5rem', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Showing latest {Math.min(recentSales.length, 30)} transactions</span>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowRecentSalesModal(false);
+                    if (setCurrentPage) setCurrentPage('transactions');
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                >
+                  <ExternalLink size={14} /> Full Transaction History
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  onClick={() => setShowRecentSalesModal(false)}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  Back to POS
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

@@ -26,6 +26,11 @@ class Sale(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items = relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
+    customer = relationship("Customer")
+
+    @property
+    def customer_name(self):
+        return self.customer.name if self.customer else "Walk-in Customer (नकद ग्राहक)"
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
@@ -40,6 +45,14 @@ class SaleItem(Base):
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product")
 
+    @property
+    def product_name(self):
+        return self.product.name if self.product else f"Item #{self.product_id}"
+
+    @property
+    def unit(self):
+        return self.product.unit if self.product else "piece"
+
 class CustomerPayment(Base):
     __tablename__ = "customer_payments"
 
@@ -53,6 +66,12 @@ class CustomerPayment(Base):
     notes = Column(Text, nullable=True)
     status = Column(String, default="Active", nullable=False)      # "Active", "Cancelled"
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    customer = relationship("Customer")
+
+    @property
+    def customer_name(self):
+        return self.customer.name if self.customer else f"Customer #{self.customer_id}"
 
 class Purchase(Base):
     __tablename__ = "purchases"

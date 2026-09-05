@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from typing import Optional, List
 from decimal import Decimal
@@ -6,7 +6,16 @@ from decimal import Decimal
 class SaleItemCreate(BaseModel):
     product_id: int
     quantity: Decimal
-    price: Decimal
+    price: Optional[Decimal] = None
+    unit_price: Optional[Decimal] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_fields(cls, data):
+        if isinstance(data, dict):
+            if data.get("price") is None and data.get("unit_price") is not None:
+                data["price"] = data["unit_price"]
+        return data
 
 class SaleItemResponse(BaseModel):
     id: int
@@ -14,6 +23,8 @@ class SaleItemResponse(BaseModel):
     quantity: Decimal
     price: Decimal
     total: Decimal
+    product_name: Optional[str] = None
+    unit: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -25,11 +36,22 @@ class SaleCreate(BaseModel):
     discount: Decimal = Decimal("0.00")
     paid_amount: Decimal = Decimal("0.00")
     payment_method: str = Field("Cash", pattern="^(Cash|UPI|Card|Credit)$")
+    payment_mode: Optional[str] = None
+    notes: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_payment(cls, data):
+        if isinstance(data, dict):
+            if not data.get("payment_method") and data.get("payment_mode"):
+                data["payment_method"] = data["payment_mode"]
+        return data
 
 class SaleResponse(BaseModel):
     id: int
     sale_number: str
     customer_id: Optional[int]
+    customer_name: Optional[str] = None
     sale_date: datetime
     subtotal: Decimal
     discount: Decimal
@@ -63,6 +85,7 @@ class CustomerPaymentResponse(BaseModel):
     id: int
     payment_number: str
     customer_id: int
+    customer_name: Optional[str] = None
     payment_date: datetime
     amount: Decimal
     payment_method: str
