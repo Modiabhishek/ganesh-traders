@@ -16,12 +16,21 @@ elif db_url.startswith("postgresql"):
         "connect_timeout": 10
     }
 
-engine = create_engine(
-    db_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-    pool_recycle=300
-)
+from sqlalchemy.pool import NullPool
+
+if "pooler.supabase.com" in db_url or ":6543" in db_url:
+    engine = create_engine(
+        db_url,
+        connect_args=connect_args,
+        poolclass=NullPool
+    )
+else:
+    engine = create_engine(
+        db_url,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+        pool_recycle=300
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
