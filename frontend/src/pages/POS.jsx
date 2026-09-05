@@ -141,25 +141,129 @@ const POS = ({ setCurrentPage, goBack }) => {
     }
   };
 
+  const handlePrintReceipt = () => {
+    const receiptElem = document.getElementById('pos-thermal-receipt');
+    if (!receiptElem) {
+      window.print();
+      return;
+    }
+
+    try {
+      let printFrame = document.getElementById('pos-print-frame');
+      if (printFrame && printFrame.parentNode) {
+        printFrame.parentNode.removeChild(printFrame);
+      }
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'pos-print-frame';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = 'none';
+      printFrame.style.opacity = '0';
+      printFrame.style.pointerEvents = 'none';
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Receipt - ${completedSale?.invoice_number || 'Bill'}</title>
+            <style>
+              @page {
+                margin: 0;
+                size: auto;
+              }
+              body {
+                margin: 0;
+                padding: 4mm 2mm;
+                font-family: monospace, -apple-system, sans-serif;
+                font-size: 12px;
+                color: #000000;
+                background: #ffffff;
+                width: 76mm;
+              }
+              * {
+                box-sizing: border-box;
+                color: #000000 !important;
+              }
+              img {
+                display: block;
+                margin: 4px auto;
+              }
+              .no-print {
+                display: none !important;
+              }
+            </style>
+          </head>
+          <body>
+            ${receiptElem.innerHTML}
+          </body>
+        </html>
+      `);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+        } catch (printErr) {
+          console.error('Iframe print failed, fallback:', printErr);
+          window.print();
+        }
+        setTimeout(() => {
+          try {
+            if (printFrame && printFrame.parentNode) {
+              printFrame.parentNode.removeChild(printFrame);
+            }
+          } catch (e) {}
+        }, 3000);
+      }, 300);
+    } catch (e) {
+      console.error('Print error:', e);
+      window.print();
+    }
+  };
+
   const handleReprintFromHistory = (sale) => {
     const saleReceipt = {
       id: sale.id,
       invoice_number: sale.sale_number,
+      financial_year: sale.financial_year || '',
       created_at: sale.sale_date,
       customer_name: sale.customer_name || (sale.customer_id ? `Customer #${sale.customer_id}` : 'Walk-in Customer (नकद ग्राहक)'),
       customer_mobile: null,
+      customer_gstin: sale.customer_gstin || null,
       items: (sale.items || []).map(it => ({
         product_id: it.product_id,
         name: it.product_name || `Item #${it.product_id}`,
-        quantity: parseFloat(it.quantity),
-        price: parseFloat(it.price),
-        unit: it.unit || 'unit'
+        product_name: it.product_name || `Item #${it.product_id}`,
+        quantity: parseFloat(it.quantity) || 1,
+        qty: parseFloat(it.quantity) || 1,
+        price: parseFloat(it.price) || 0,
+        sale_price: parseFloat(it.price) || 0,
+        line_total: (parseFloat(it.price) || 0) * (parseFloat(it.quantity) || 1),
+        unit: it.unit || 'unit',
+        hsn_code: it.hsn_code || null,
+        tax_rate: parseFloat(it.tax_rate || 0)
       })),
-      subtotal: parseFloat(sale.subtotal) || parseFloat(sale.total_amount),
+      tax_slabs: sale.tax_slabs || [],
+      subtotal: parseFloat(sale.subtotal) || parseFloat(sale.total_amount) || 0,
       discount: parseFloat(sale.discount) || 0,
-      grand_total: parseFloat(sale.total_amount),
-      payment_mode: sale.payment_method,
-      tender_amount: parseFloat(sale.paid_amount) || parseFloat(sale.total_amount),
+      taxable_amount: parseFloat(sale.taxable_amount || 0),
+      cgst_amount: parseFloat(sale.cgst_amount || 0),
+      sgst_amount: parseFloat(sale.sgst_amount || 0),
+      igst_amount: parseFloat(sale.igst_amount || 0),
+      total_tax_amount: parseFloat(sale.total_tax_amount || 0),
+      round_off: parseFloat(sale.round_off || 0),
+      grand_total: parseFloat(sale.total_amount) || 0,
+      payment_mode: sale.payment_method || 'Cash',
+      paid_amount: parseFloat(sale.paid_amount) || parseFloat(sale.counter_paid) || parseFloat(sale.total_amount) || 0,
+      due_amount: parseFloat(sale.due_amount) || 0,
+      tender_amount: parseFloat(sale.paid_amount) || parseFloat(sale.total_amount) || 0,
       change_due: 0
     };
     setCompletedSale(saleReceipt);
@@ -1030,80 +1134,85 @@ const POS = ({ setCurrentPage, goBack }) => {
               </div>
 
               <div style={{ marginBottom: '8px' }}>
-                {completedSale.items.map((it, idx) => (
-                  <div key={idx} style={{ margin: '3px 0' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '11px' }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product_name || it.name}</div>
-                      <div style={{ textAlign: 'center' }}>{it.qty || it.quantity} {it.unit}</div>
-                      <div style={{ textAlign: 'right' }}>₹{(it.sale_price || it.price).toFixed(2)}</div>
-                      <div style={{ textAlign: 'right' }}>₹{(it.line_total || (it.price * it.quantity)).toFixed(2)}</div>
+                {(completedSale.items || []).map((it, idx) => {
+                  const qty = Number(it.qty ?? it.quantity ?? 1);
+                  const price = Number(it.sale_price ?? it.price ?? 0);
+                  const total = Number(it.line_total ?? (price * qty));
+                  return (
+                    <div key={idx} style={{ margin: '3px 0' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '11px' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product_name || it.name || 'Item'}</div>
+                        <div style={{ textAlign: 'center' }}>{qty} {it.unit || 'unit'}</div>
+                        <div style={{ textAlign: 'right' }}>₹{price.toFixed(2)}</div>
+                        <div style={{ textAlign: 'right' }}>₹{total.toFixed(2)}</div>
+                      </div>
+                      {it.hsn_code && (
+                        <div style={{ fontSize: '9px', color: '#555' }}>HSN: {it.hsn_code} | GST: {it.tax_rate || 0}%</div>
+                      )}
                     </div>
-                    {it.hsn_code && (
-                      <div style={{ fontSize: '9px', color: '#555' }}>HSN: {it.hsn_code} | GST: {it.tax_rate}%</div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div style={{ borderTop: '1px dashed #000', paddingTop: '6px', fontSize: '11px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Subtotal:</span>
-                  <span>₹{completedSale.subtotal.toFixed(2)}</span>
+                  <span>₹{Number(completedSale.subtotal || 0).toFixed(2)}</span>
                 </div>
-                {completedSale.discount > 0 && (
+                {Number(completedSale.discount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Discount:</span>
-                    <span>-₹{completedSale.discount.toFixed(2)}</span>
+                    <span>-₹{Number(completedSale.discount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.taxable_amount > 0 && (
+                {Number(completedSale.taxable_amount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
                     <span>Taxable Value:</span>
-                    <span>₹{completedSale.taxable_amount.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.taxable_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.cgst_amount > 0 && (
+                {Number(completedSale.cgst_amount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
                     <span>CGST:</span>
-                    <span>₹{completedSale.cgst_amount.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.cgst_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.sgst_amount > 0 && (
+                {Number(completedSale.sgst_amount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
                     <span>SGST:</span>
-                    <span>₹{completedSale.sgst_amount.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.sgst_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.igst_amount > 0 && (
+                {Number(completedSale.igst_amount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
                     <span>IGST:</span>
-                    <span>₹{completedSale.igst_amount.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.igst_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.round_off !== 0 && (
+                {Boolean(completedSale.round_off && Number(completedSale.round_off) !== 0) && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
                     <span>Round Off:</span>
-                    <span>{completedSale.round_off > 0 ? `+₹${completedSale.round_off.toFixed(2)}` : `-₹${Math.abs(completedSale.round_off).toFixed(2)}`}</span>
+                    <span>{Number(completedSale.round_off) > 0 ? `+₹${Number(completedSale.round_off).toFixed(2)}` : `-₹${Math.abs(Number(completedSale.round_off)).toFixed(2)}`}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', margin: '4px 0', borderTop: '1px solid #000', paddingTop: '4px' }}>
                   <span>GRAND TOTAL:</span>
-                  <span>₹{completedSale.grand_total.toFixed(2)}</span>
+                  <span>₹{Number(completedSale.grand_total || 0).toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span>Paid ({completedSale.payment_mode}):</span>
-                  <span>₹{(completedSale.paid_amount || completedSale.tender_amount || completedSale.grand_total).toFixed(2)}</span>
+                  <span>₹{Number(completedSale.paid_amount ?? completedSale.tender_amount ?? completedSale.grand_total ?? 0).toFixed(2)}</span>
                 </div>
-                {completedSale.due_amount > 0 && (
+                {Number(completedSale.due_amount || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#b91c1c' }}>
                     <span>Balance Due (Khata):</span>
-                    <span>₹{completedSale.due_amount.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.due_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {completedSale.change_due > 0 && (
+                {Number(completedSale.change_due || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
                     <span>Change Return:</span>
-                    <span>₹{completedSale.change_due.toFixed(2)}</span>
+                    <span>₹{Number(completedSale.change_due || 0).toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -1121,9 +1230,9 @@ const POS = ({ setCurrentPage, goBack }) => {
                   {completedSale.tax_slabs.map((s, sIdx) => (
                     <div key={sIdx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                       <div>{s.tax_rate}%</div>
-                      <div style={{ textAlign: 'right' }}>₹{s.taxable_amount.toFixed(2)}</div>
-                      <div style={{ textAlign: 'right' }}>₹{(s.cgst_amount + s.sgst_amount).toFixed(2)}</div>
-                      <div style={{ textAlign: 'right' }}>₹{s.tax_amount.toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{Number(s.taxable_amount || 0).toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{(Number(s.cgst_amount || 0) + Number(s.sgst_amount || 0)).toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{Number(s.tax_amount || 0).toFixed(2)}</div>
                     </div>
                   ))}
                 </div>
@@ -1132,7 +1241,7 @@ const POS = ({ setCurrentPage, goBack }) => {
               {/* QR Code & Footer */}
               <div style={{ textAlign: 'center', marginTop: '12px', borderTop: '1px dashed #000', paddingTop: '8px', fontSize: '11px' }}>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${completedSale.grand_total.toFixed(2)}&tn=${completedSale.invoice_number}&cu=INR`)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${Number(completedSale.grand_total || 0).toFixed(2)}&tn=${encodeURIComponent(completedSale.invoice_number || '')}&cu=INR`)}`}
                   alt="UPI QR" 
                   style={{ width: '80px', height: '80px', display: 'block', margin: '4px auto' }}
                 />
@@ -1156,7 +1265,7 @@ const POS = ({ setCurrentPage, goBack }) => {
                 type="button" 
                 className="btn btn-primary" 
                 style={{ flex: 1, background: '#3b82f6', borderColor: '#2563eb' }}
-                onClick={() => window.print()}
+                onClick={handlePrintReceipt}
               >
                 <Printer size={16} /> Print Receipt
               </button>
@@ -1244,7 +1353,7 @@ const POS = ({ setCurrentPage, goBack }) => {
                             {sale.items ? `${sale.items.length} items` : '-'}
                           </td>
                           <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 700 }}>
-                            ₹{parseFloat(sale.total_amount).toFixed(2)}
+                            ₹{parseFloat(sale.total_amount || 0).toFixed(2)}
                           </td>
                           <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                             <span style={{ 
@@ -1317,6 +1426,23 @@ const POS = ({ setCurrentPage, goBack }) => {
             margin: 0;
             size: auto;
           }
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+            background: #fff !important;
+            color: #000 !important;
+          }
+          .pos-container, .modal-backdrop, .glass-panel {
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+            position: static !important;
+            background: #fff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -1324,6 +1450,7 @@ const POS = ({ setCurrentPage, goBack }) => {
             visibility: visible !important;
           }
           #pos-thermal-receipt {
+            display: block !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -1331,6 +1458,7 @@ const POS = ({ setCurrentPage, goBack }) => {
             margin: 0 !important;
             padding: 2mm !important;
             background: #fff !important;
+            color: #000 !important;
           }
           .no-print {
             display: none !important;
