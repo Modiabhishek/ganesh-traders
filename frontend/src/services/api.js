@@ -157,6 +157,10 @@ export const productAPI = {
   deleteProduct: async (id) => {
     const response = await api.delete(`/products/${id}`);
     return response.data;
+  },
+  lookupBarcode: async (barcode) => {
+    const response = await api.get(`/products/lookup-barcode/${encodeURIComponent(barcode)}`);
+    return response.data;
   }
 };
 

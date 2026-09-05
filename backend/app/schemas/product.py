@@ -21,6 +21,7 @@ class ProductBase(BaseModel):
     name: str = Field(..., min_length=1)
     category_id: int
     brand: Optional[str] = None
+    barcode: Optional[str] = None
     unit: str = Field("piece", pattern="^(kg|gram|litre|ml|piece|packet|box|dozen|bag|quintal)$")
     pack_size: Optional[str] = None
     purchase_price: Decimal = Field(default=Decimal("0.00"))
@@ -35,6 +36,7 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     category_id: Optional[int] = None
     brand: Optional[str] = None
+    barcode: Optional[str] = None
     unit: Optional[str] = Field(None, pattern="^(kg|gram|litre|ml|piece|packet|box|dozen|bag|quintal)$")
     pack_size: Optional[str] = None
     purchase_price: Optional[Decimal] = None
@@ -47,6 +49,7 @@ class ProductUpdate(BaseModel):
 class ProductResponse(ProductBase):
     id: int
     product_code: str
+    barcode: Optional[str] = None
     current_stock: Decimal
     status: str
     created_at: datetime

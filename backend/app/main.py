@@ -88,6 +88,13 @@ def startup_event():
         except Exception:
             db.rollback()
 
+        # Product barcode column migration
+        try:
+            db.execute(text("ALTER TABLE products ADD COLUMN barcode VARCHAR"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         # Seed initial Live Updates announcement
         from .models.customer import LiveUpdate
         exists_update = db.query(LiveUpdate).first()

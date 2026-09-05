@@ -41,11 +41,27 @@ def get_products(
         query = query.filter(
             Product.name.ilike(search_filter) |
             Product.product_code.ilike(search_filter) |
+            Product.barcode.ilike(search_filter) |
             Product.brand.ilike(search_filter)
         )
     if category_id:
         query = query.filter(Product.category_id == category_id)
     return query.all()
+
+@router.get("/lookup-barcode/{barcode}", response_model=ProductResponse)
+def lookup_barcode(
+    barcode: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    clean_code = barcode.strip()
+    prod = db.query(Product).filter(
+        (Product.barcode == clean_code) | (Product.product_code == clean_code),
+        Product.status == "Active"
+    ).first()
+    if not prod:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No active product with code '{clean_code}'.")
+    return prod
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product_in: ProductCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -56,6 +72,7 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db), cur
     code = generate_product_code(db)
     new_prod = Product(
         product_code=code,
+        barcode=product_in.barcode.strip() if product_in.barcode else code,
         name=product_in.name,
         category_id=product_in.category_id,
         brand=product_in.brand,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { productAPI } from '../services/api';
-import { PlusCircle, Search, Edit3, Trash2, ArrowLeft, Loader, AlertTriangle, CheckCircle, XCircle, Printer } from 'lucide-react';
+import { PlusCircle, Search, Edit3, Trash2, ArrowLeft, Loader, AlertTriangle, CheckCircle, XCircle, Printer, Barcode, Tag } from 'lucide-react';
+import BarcodeGeneratorModal from '../components/BarcodeGeneratorModal';
 
 const ProductCatalog = ({ setCurrentPage, goBack }) => {
   const [products, setProducts] = useState([]);
@@ -14,9 +15,14 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
 
+  // Barcode Modal states
+  const [barcodeModalProd, setBarcodeModalProd] = useState(null);
+  const [showBulkBarcodeModal, setShowBulkBarcodeModal] = useState(false);
+
   // Product Form Input state
   const [prodForm, setProdForm] = useState({
     name: '',
+    barcode: '',
     category_id: '',
     brand: '',
     unit: 'piece',
@@ -64,6 +70,7 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
     // Construct payload
     const payload = {
       name: prodForm.name,
+      barcode: prodForm.barcode.trim() || null,
       category_id: parseInt(prodForm.category_id),
       brand: prodForm.brand || null,
       unit: prodForm.unit,
@@ -88,6 +95,7 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
       setEditingProduct(null);
       setProdForm({
         name: '',
+        barcode: '',
         category_id: categories.length > 0 ? categories[0].id : '',
         brand: '',
         unit: 'piece',
@@ -125,6 +133,7 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
     setEditingProduct(prod);
     setProdForm({
       name: prod.name,
+      barcode: prod.barcode || prod.product_code || '',
       category_id: prod.category_id,
       brand: prod.brand || '',
       unit: prod.unit,
@@ -250,6 +259,15 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
         >
           <PlusCircle size={16} /> Manage Categories
         </button>
+
+        <button 
+          className="btn btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#3b82f6', borderColor: 'rgba(59, 130, 246, 0.4)' }}
+          onClick={() => setShowBulkBarcodeModal(true)}
+          disabled={products.length === 0}
+        >
+          <Tag size={16} /> Bulk Barcode Sheet ({products.length})
+        </button>
       </section>
 
       {/* Category Creation modal */}
@@ -290,6 +308,17 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
                 required 
                 value={prodForm.name} 
                 onChange={e => setProdForm({...prodForm, name: e.target.value})} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Barcode / SKU (बारकोड नंबर)</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="Scan barcode or leave blank to auto-use product code"
+                value={prodForm.barcode} 
+                onChange={e => setProdForm({...prodForm, barcode: e.target.value})} 
               />
             </div>
 
@@ -461,6 +490,15 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
                       <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
                         <button 
                           className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem', color: '#3b82f6' }}
+                          title="Generate & Print Barcode Labels"
+                          onClick={() => setBarcodeModalProd(p)}
+                        >
+                          <Barcode size={14} />
+                        </button>
+
+                        <button 
+                          className="btn btn-secondary btn-sm"
                           style={{ padding: '0.4rem' }}
                           title="Edit Product"
                           onClick={() => handleEditClick(p)}
@@ -486,6 +524,21 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
             </tbody>
           </table>
         </section>
+      )}
+
+      {/* Barcode Generator Modals */}
+      {barcodeModalProd && (
+        <BarcodeGeneratorModal 
+          product={barcodeModalProd} 
+          onClose={() => setBarcodeModalProd(null)} 
+        />
+      )}
+
+      {showBulkBarcodeModal && (
+        <BarcodeGeneratorModal 
+          products={products} 
+          onClose={() => setShowBulkBarcodeModal(false)} 
+        />
       )}
 
       {/* Global CSS styles for Print */}

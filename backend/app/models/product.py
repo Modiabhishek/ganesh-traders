@@ -22,6 +22,7 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_code = Column(String, unique=True, index=True, nullable=False)
+    barcode = Column(String, unique=True, index=True, nullable=True)
     name = Column(String, index=True, nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     brand = Column(String, nullable=True)

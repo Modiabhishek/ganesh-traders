@@ -13,7 +13,8 @@ import StaffManager from './pages/StaffManager';
 import ExpenseManager from './pages/ExpenseManager';
 import CustomerPortal from './pages/CustomerPortal';
 import AnnouncementManager from './pages/AnnouncementManager';
-import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout, Bell, Menu, X, Store, ShoppingBag, Sparkles, Package } from 'lucide-react';
+import POS from './pages/POS';
+import { Sun, Moon, LogOut, LayoutDashboard, Users, PlusCircle, Upload, LogIn, ClipboardList, History, Shield, TrendingDown, Sprout, Bell, Menu, X, Store, ShoppingBag, Sparkles, Package, ShoppingCart } from 'lucide-react';
 
 const decodeToken = (token) => {
   if (!token) return null;
@@ -219,6 +220,8 @@ function App() {
         return <CustomerList setCurrentPage={navigateTo} goBack={goBack} setSelectCustomerId={setSelectCustomerId} />;
       case 'ledger':
         return <Ledger customerId={selectCustomerId} setCurrentPage={navigateTo} goBack={goBack} />;
+      case 'pos':
+        return <POS setCurrentPage={navigateTo} goBack={goBack} />;
       case 'new-sale':
         return <NewSale setCurrentPage={navigateTo} goBack={goBack} />;
       case 'import-customers':
@@ -438,6 +441,20 @@ function App() {
             onClick={() => navigateTo('customers')}
           >
             <Users size={18} /> Customers
+          </button>
+
+          <button 
+            className={`btn ${currentPage === 'pos' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ 
+              justifyContent: 'flex-start', 
+              border: currentPage === 'pos' ? 'none' : '1px solid rgba(245, 158, 11, 0.35)',
+              background: currentPage === 'pos' ? 'var(--primary)' : 'rgba(245, 158, 11, 0.12)',
+              color: currentPage === 'pos' ? '#000' : 'var(--primary)',
+              fontWeight: 700
+            }}
+            onClick={() => navigateTo('pos')}
+          >
+            <ShoppingCart size={18} /> POS Counter (काउंटर बिलिंग)
           </button>
 
           <button 
