@@ -8,9 +8,16 @@ const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  if (isCapacitor) {
-    const savedIP = localStorage.getItem('server_ip') || '192.168.1.15';
+  const customApi = localStorage.getItem('custom_api_url');
+  if (customApi) {
+    return customApi.replace(/\/+$/, '');
+  }
+  const savedIP = localStorage.getItem('server_ip');
+  if (savedIP) {
     return `http://${savedIP}:8000/api`;
+  }
+  if (isCapacitor) {
+    return `http://${savedIP || '192.168.1.15'}:8000/api`;
   }
   if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('vercel.app') || window.location.hostname.includes('modi.app')) {
     return 'https://ganesh-traders-backend.onrender.com/api';
@@ -38,7 +45,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use((response) => {
   return response;
 }, (error) => {
-  if (error.response && error.response.status === 401) {
+  if (error.response && error.response.status === 401 && !error.config?.url?.includes('/auth/login')) {
     localStorage.removeItem('token');
     window.location.reload();
   }
@@ -46,11 +53,19 @@ api.interceptors.response.use((response) => {
 });
 
 export const authAPI = {
+  checkHealth: async () => {
+    try {
+      const res = await api.get('/health', { timeout: 5000 });
+      return res.data;
+    } catch (e) {
+      return null;
+    }
+  },
   login: async (username, password) => {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
-    const response = await api.post('/auth/login', formData);
+    const response = await api.post('/auth/login', formData, { timeout: 15000 });
     return response.data; // returns { access_token, token_type }
   },
   register: async (username, password, role = 'Staff') => {

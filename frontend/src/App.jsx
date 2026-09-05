@@ -76,6 +76,29 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [loading, setLoading] = useState(false);
   const [serverIP, setServerIP] = useState(localStorage.getItem('server_ip') || '192.168.1.15');
+  const [customApiUrl, setCustomApiUrl] = useState(localStorage.getItem('custom_api_url') || '');
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
+  const [showServerConfig, setShowServerConfig] = useState(false);
+
+  const testServer = async () => {
+    setServerStatus('checking');
+    try {
+      const data = await authAPI.checkHealth();
+      if (data && data.status) {
+        setServerStatus('online');
+      } else {
+        setServerStatus('offline');
+      }
+    } catch {
+      setServerStatus('offline');
+    }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      testServer();
+    }
+  }, [token]);
   
   // Theme state
   const [darkTheme, setDarkTheme] = useState(localStorage.getItem('theme') === 'dark');
@@ -91,20 +114,20 @@ function App() {
 
   // Slide curtains open on initial page load
   useEffect(() => {
-    if (!token && !curtainClickable) {
+    if (!token) {
       setIsCurtainOpening(false);
       const openTimer = setTimeout(() => {
         setIsCurtainOpening(true);
-      }, 500);
+      }, 300);
       const hideTimer = setTimeout(() => {
         setShowCurtain(false);
-      }, 1700);
+      }, 1500);
       return () => {
         clearTimeout(openTimer);
         clearTimeout(hideTimer);
       };
     }
-  }, [token, curtainClickable]);
+  }, [token]);
 
   // Sync theme to body element
   useEffect(() => {
@@ -193,13 +216,11 @@ function App() {
   };
 
   const handleCurtainClick = () => {
-    if (curtainClickable) {
-      setIsCurtainOpening(true);
-      setCurtainClickable(false);
-      setTimeout(() => {
-        setShowCurtain(false);
-      }, 1200);
-    }
+    setIsCurtainOpening(true);
+    setCurtainClickable(false);
+    setTimeout(() => {
+      setShowCurtain(false);
+    }, 1000);
   };
 
 
@@ -316,24 +337,97 @@ function App() {
               </button>
             </form>
 
-            {isCapacitor && (
-              <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', animation: 'fadeIn 0.3s ease' }}>
-                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
-                  Server PC IP Address (Wi-Fi IP)
-                </label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  style={{ fontSize: '0.9rem', padding: '0.6rem 0.75rem', background: 'var(--bg-primary)' }}
-                  value={serverIP}
-                  onChange={e => {
-                    setServerIP(e.target.value);
-                    localStorage.setItem('server_ip', e.target.value);
-                  }}
-                  placeholder="e.g. 192.168.1.15"
-                />
+            {/* Server Connection Status & Configuration for ALL Devices */}
+            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Server Status:
+                </span>
+                <span 
+                  className={`badge ${serverStatus === 'online' ? 'badge-success' : serverStatus === 'checking' ? 'badge-warning' : 'badge-danger'}`} 
+                  style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  onClick={testServer}
+                  title="Click to re-test server connection"
+                >
+                  {serverStatus === 'online' ? '🟢 Server Online' : serverStatus === 'checking' ? '🟡 Checking Server...' : '🔴 Server Offline'}
+                </span>
               </div>
-            )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowServerConfig(!showServerConfig)}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                >
+                  {showServerConfig ? '▲ Hide Server Settings' : '⚙️ Configure Backend Server / Wi-Fi IP'}
+                </button>
+                <button
+                  type="button"
+                  onClick={testServer}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', padding: 0 }}
+                >
+                  🔄 Retry
+                </button>
+              </div>
+
+              {showServerConfig && (
+                <div style={{ marginTop: '0.75rem', padding: '0.85rem', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', animation: 'fadeIn 0.2s ease' }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>
+                    Server Address / Wi-Fi IP
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem', marginBottom: '0.6rem', width: '100%' }}
+                    value={customApiUrl || (serverIP ? `http://${serverIP}:8000/api` : '')}
+                    onChange={e => {
+                      setCustomApiUrl(e.target.value);
+                      localStorage.setItem('custom_api_url', e.target.value);
+                    }}
+                    placeholder="e.g. http://192.168.1.15:8000/api"
+                  />
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem' }}
+                      onClick={() => {
+                        const url = 'http://localhost:8000/api';
+                        setCustomApiUrl(url);
+                        localStorage.setItem('custom_api_url', url);
+                        setTimeout(testServer, 100);
+                      }}
+                    >
+                      Local PC (8000)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem' }}
+                      onClick={() => {
+                        const url = 'https://ganesh-traders-backend.onrender.com/api';
+                        setCustomApiUrl(url);
+                        localStorage.setItem('custom_api_url', url);
+                        setTimeout(testServer, 100);
+                      }}
+                    >
+                      Render Cloud
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }}
+                      onClick={() => {
+                        localStorage.setItem('custom_api_url', customApiUrl);
+                        testServer();
+                      }}
+                    >
+                      Save & Test
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <style>{`
@@ -554,7 +648,7 @@ function App() {
         <div 
           className={`theater-curtains-overlay no-print ${curtainClickable ? 'clickable' : ''}`}
           onClick={handleCurtainClick}
-          style={{ cursor: curtainClickable ? 'pointer' : 'default', pointerEvents: curtainClickable ? 'auto' : 'none' }}
+          style={{ cursor: 'pointer', pointerEvents: 'auto' }}
         >
           <div className="curtain-valance" />
           {curtainClickable && (

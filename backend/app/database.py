@@ -13,8 +13,7 @@ if db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 elif db_url.startswith("postgresql"):
     connect_args = {
-        "connect_timeout": 10,
-        "options": "-c statement_timeout=20000 -c lock_timeout=5000"
+        "connect_timeout": 10
     }
 
 engine = create_engine(
