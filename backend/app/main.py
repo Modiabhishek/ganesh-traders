@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
-from .models import User, Category, Product, bill
+from .models import User, Category, Product, Bill, BillItem, BillPayment, FinancialYearCounter
 from .models.customer import Customer
 from .routes import auth, customers, products, transactions, backup, bills
 from .services.auth import get_password_hash
@@ -59,25 +59,51 @@ def startup_event():
             print("Startup: Legacy users status migration warning:", e)
 
         # 3. Customer portal, product & sales migrations
-        for col_def in [
-            "ALTER TABLE customers ADD COLUMN portal_username VARCHAR",
-            "ALTER TABLE customers ADD COLUMN portal_password_hash VARCHAR",
-            "ALTER TABLE customers ADD COLUMN portal_status VARCHAR DEFAULT 'Blocked'",
-            "ALTER TABLE customers ADD COLUMN fathers_name VARCHAR",
-            "ALTER TABLE customers ADD COLUMN reference VARCHAR",
-            "ALTER TABLE products ADD COLUMN barcode VARCHAR",
-            "ALTER TABLE products ADD COLUMN mrp NUMERIC(12, 2)",
-            "ALTER TABLE products ADD COLUMN tax_rate NUMERIC(5, 2) DEFAULT 0.00",
-            "ALTER TABLE products ADD COLUMN is_tax_inclusive BOOLEAN DEFAULT 1",
-            "ALTER TABLE products ADD COLUMN hsn_code VARCHAR",
-            "ALTER TABLE products ADD COLUMN allow_backorder BOOLEAN DEFAULT 1",
-            "ALTER TABLE sales ADD COLUMN counter_paid NUMERIC(12, 2) DEFAULT 0.00",
-        ]:
+        is_pg = engine.dialect.name == "postgresql"
+        bool_val = "TRUE" if is_pg else "1"
+        if_not_exists = "IF NOT EXISTS " if is_pg else ""
+
+        migrations = [
+            # Customers table migrations
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}portal_username VARCHAR",
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}portal_password_hash VARCHAR",
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}portal_status VARCHAR DEFAULT 'Blocked'",
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}fathers_name VARCHAR",
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}reference VARCHAR",
+            f"ALTER TABLE customers ADD COLUMN {if_not_exists}gstin VARCHAR",
+            # Products table migrations
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}barcode VARCHAR",
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}mrp NUMERIC(12, 2) DEFAULT 0.00",
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}tax_rate NUMERIC(5, 2) DEFAULT 0.00",
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}is_tax_inclusive BOOLEAN DEFAULT {bool_val}",
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}hsn_code VARCHAR",
+            f"ALTER TABLE products ADD COLUMN {if_not_exists}allow_backorder BOOLEAN DEFAULT {bool_val}",
+            # Sales table migrations
+            f"ALTER TABLE sales ADD COLUMN {if_not_exists}counter_paid NUMERIC(12, 2) DEFAULT 0.00",
+            f"ALTER TABLE sales ADD COLUMN {if_not_exists}paid_amount NUMERIC(12, 2) DEFAULT 0.00",
+            f"ALTER TABLE sales ADD COLUMN {if_not_exists}due_amount NUMERIC(12, 2) DEFAULT 0.00",
+            f"ALTER TABLE sales ADD COLUMN {if_not_exists}payment_status VARCHAR DEFAULT 'PAID'",
+        ]
+
+        for col_def in migrations:
             try:
                 db.execute(text(col_def))
                 db.commit()
-            except Exception:
+            except Exception as ex:
                 db.rollback()
+                err_str = str(ex).lower()
+                if "already exists" not in err_str and "duplicate column" not in err_str:
+                    print(f"Startup migration notice: {col_def} -> {ex}")
+
+        # Ensure defaults for products table
+        try:
+            db.execute(text(f"UPDATE products SET is_tax_inclusive = {bool_val} WHERE is_tax_inclusive IS NULL"))
+            db.execute(text(f"UPDATE products SET allow_backorder = {bool_val} WHERE allow_backorder IS NULL"))
+            db.execute(text("UPDATE products SET tax_rate = 0.00 WHERE tax_rate IS NULL"))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print("Startup: Product column defaults update notice:", e)
 
         # 4. Seed initial Live Updates announcement
         try:
