@@ -232,4 +232,11 @@ export const cerealAPI = {
   }
 };
 
+export const backupAPI = {
+  downloadBackup: async () => {
+    const response = await api.get('/backup/export', { responseType: 'blob' });
+    return response.data;
+  }
+};
+
 export default api;

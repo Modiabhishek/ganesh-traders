@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
 from .models import User, Category, Product
 from .models.customer import Customer
-from .routes import auth, customers, products, transactions
+from .routes import auth, customers, products, transactions, backup
 from .services.auth import get_password_hash
 from decimal import Decimal
 from sqlalchemy import text
@@ -31,6 +31,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
+app.include_router(backup.router, prefix="/api")
 
 @app.on_event("startup")
 def startup_event():
@@ -97,20 +98,15 @@ def startup_event():
             ))
             db.commit()
 
-        # Seed default admin user
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
+        # Seed default admin user only if no Admin exists in the database
+        admin_exists = db.query(User).filter(User.role == "Admin").first()
+        if not admin_exists:
             db.add(User(
                 username="admin",
                 password_hash=get_password_hash("adminpass"),
                 role="Admin",
                 status="Active"
             ))
-        else:
-            # Force status to Active, Role to Admin, and password to 'adminpass'
-            admin.status = "Active"
-            admin.role = "Admin"
-            admin.password_hash = get_password_hash("adminpass")
             db.commit()
 
         # Free up portal_username and clean up mobile for any existing Inactive customers
@@ -176,25 +172,3 @@ def startup_event():
 def read_root():
     return {"status": "healthy", "service": "Family Business Management System API"}
 
-from .services.auth import verify_password
-@app.get("/api/debug/admin")
-def debug_admin():
-    db = SessionLocal()
-    try:
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            return {"status": "error", "message": "Admin user not found in database"}
-        
-        verifies = verify_password("adminpass", admin.password_hash)
-        return {
-            "status": "success",
-            "username": admin.username,
-            "role": admin.role,
-            "user_status": admin.status,
-            "password_hash": admin.password_hash,
-            "verifies_correctly": verifies
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-    finally:
-        db.close()

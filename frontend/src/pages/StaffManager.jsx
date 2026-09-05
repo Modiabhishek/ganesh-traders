@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
-import { Users, UserPlus, Trash2, ArrowLeft, Loader, Key, ShieldCheck } from 'lucide-react';
+import { authAPI, backupAPI } from '../services/api';
+import { Users, UserPlus, Trash2, ArrowLeft, Loader, Key, ShieldCheck, Download } from 'lucide-react';
 
 const decodeToken = (token) => {
   if (!token) return null;
@@ -20,6 +20,7 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
 
   // Form states
   const [username, setUsername] = useState('');
@@ -139,6 +140,29 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
     }
   };
 
+  const handleDownloadBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const data = await backupAPI.downloadBackup();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      a.download = `ganesh_traders_full_backup_${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setMessage({ text: 'Full business backup downloaded successfully! Store this file safely.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to download business backup. Verify admin permissions.', type: 'danger' });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   return (
     <div className="layout-container" style={{ animation: 'fadeIn 0.25s ease' }}>
       <header className="flex-between" style={{ marginBottom: '2rem' }}>
@@ -154,10 +178,18 @@ const StaffManager = ({ setCurrentPage, goBack }) => {
         </div>
       )}
 
-      {/* Action button */}
-      <section style={{ marginBottom: '1.5rem' }}>
+      {/* Action buttons */}
+      <section style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
           <UserPlus size={16} /> Create Staff Login
+        </button>
+        <button 
+          className="btn btn-secondary" 
+          onClick={handleDownloadBackup}
+          disabled={backupLoading}
+          style={{ background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981', fontWeight: 600 }}
+        >
+          <Download size={16} /> {backupLoading ? 'Exporting Complete Backup...' : 'Download Full Business Backup (JSON)'}
         </button>
       </section>
 

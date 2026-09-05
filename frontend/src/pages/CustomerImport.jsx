@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { customerAPI } from '../services/api';
-import { ArrowLeft, Upload, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { customerAPI, backupAPI } from '../services/api';
+import { ArrowLeft, Upload, CheckCircle2, AlertTriangle, AlertCircle, Download, ShieldCheck } from 'lucide-react';
 
 const CustomerImport = ({ setCurrentPage, goBack }) => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
   const handleFileChange = (e) => {
@@ -75,18 +76,66 @@ const CustomerImport = ({ setCurrentPage, goBack }) => {
     }
   };
 
+  const handleDownloadBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const data = await backupAPI.downloadBackup();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      a.download = `ganesh_traders_full_backup_${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setMessage({ text: 'Full business backup exported & downloaded successfully! Store this file safely.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to download business backup. Verify admin permissions.', type: 'danger' });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   return (
     <div className="layout-container" style={{ animation: 'fadeIn 0.25s ease' }}>
       <header className="flex-between" style={{ marginBottom: '2rem' }}>
         <button className="btn btn-secondary" onClick={goBack}>
           <ArrowLeft size={16} /> Back
         </button>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Import Customer Data</h1>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Data Protection & Customer Import</h1>
       </header>
 
       {message.text && (
         <div className={`badge badge-${message.type}`} style={{ width: '100%', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem', display: 'block', textTransform: 'none' }}>
           {message.text}
+        </div>
+      )}
+
+      {/* Full Business Backup Card */}
+      {!preview && (
+        <div className="glass-panel" style={{ marginBottom: '2rem', padding: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.08) 100%)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#10b981', margin: 0 }}>Business Data Protection & Backup</h3>
+              <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                Download a complete offline copy of all customers, ledger accounts, sales, crops, and payments.
+              </p>
+            </div>
+          </div>
+          <button 
+            className="btn btn-primary"
+            onClick={handleDownloadBackup}
+            disabled={backupLoading}
+            style={{ background: '#10b981', borderColor: '#059669', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem' }}
+          >
+            <Download size={18} /> {backupLoading ? 'Exporting...' : 'Download Full Backup (JSON)'}
+          </button>
         </div>
       )}
 

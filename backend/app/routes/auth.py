@@ -8,11 +8,23 @@ from ..models.user import User
 from ..models.customer import Customer
 from ..schemas.user import UserCreate, UserResponse, Token
 from ..services.auth import verify_password, get_password_hash, create_access_token
+from ..dependencies.auth import get_current_user
+from typing import List, Optional
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+def register(
+    user_in: UserCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can register new staff accounts."
+        )
+
     db_user = db.query(User).filter(func.lower(User.username) == func.lower(user_in.username)).first()
     if db_user:
         if db_user.status == "Active":
@@ -66,8 +78,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-from ..dependencies.auth import get_current_user
-from typing import List, Optional
+
 
 @router.get("/users", response_model=List[UserResponse])
 def get_users(
