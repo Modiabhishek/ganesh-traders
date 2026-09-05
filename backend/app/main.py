@@ -170,8 +170,16 @@ def startup_event():
             pass
     print("Startup: Completed successfully.")
 
+import os
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
+
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+
 @app.get("/")
 def read_root():
+    if os.path.exists(frontend_dist) and os.path.isfile(os.path.join(frontend_dist, "index.html")):
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
     return {"status": "healthy", "service": "Ganesh Traders Business API"}
 
 @app.get("/health")
@@ -181,4 +189,16 @@ def health_check():
 @app.get("/api/health")
 def api_health_check():
     return {"status": "ok", "service": "Ganesh Traders Business API"}
+
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
 

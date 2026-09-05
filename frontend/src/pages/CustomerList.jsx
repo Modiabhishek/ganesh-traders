@@ -61,7 +61,7 @@ const CustomerList = ({ setCurrentPage, setSelectCustomerId }) => {
   const handleSendReminder = (customer) => {
     const mobile = customer.mobile ? customer.mobile.replace(/[^0-9]/g, '') : '';
     const formattedMobile = mobile.length === 10 ? `91${mobile}` : mobile;
-    const msg = `Hello ${customer.name},\nThis is a friendly reminder from *Ganesh Traders* that you have a pending outstanding balance of *Rs. ${parseFloat(customer.current_balance).toFixed(2)}* on your account ledger.\n\nPlease clear the balance at your earliest convenience using UPI or Cash at our store.\n\nThank you!\n*Ganesh Traders*`;
+    const msg = `Hello ${customer.name},\nThis is a friendly reminder from *Ganesh Traders* that you have a pending outstanding balance of *Rs. ${parseFloat(customer.current_balance).toFixed(2)}* on your account ledger.\n\nPlease clear the balance at your earliest convenience using UPI (*7023062391-2@ybl*) or Cash at our store.\n\nThank you!\n*Ganesh Traders*`;
     const encodedText = encodeURIComponent(msg);
     const whatsappUrl = `https://wa.me/${formattedMobile}?text=${encodedText}`;
     window.open(whatsappUrl, '_blank');

@@ -137,7 +137,7 @@ const CustomerPortal = ({ token, onLogout }) => {
                 ₹{currentBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </h2>
               <p style={{ fontSize: '0.925rem', color: '#713f12', lineHeight: '1.4' }}>
-                Dear <strong>{customer?.name}</strong>, you have a pending due on your account. Please clear it at your earliest convenience using UPI or cash at our store. 
+                Dear <strong>{customer?.name}</strong>, you have a pending due on your account. Please clear it at your earliest convenience using UPI (<strong>7023062391-2@ybl</strong>) or cash at our store. 
               </p>
               <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.75rem' }}>
                 Thank you for shopping with Ganesh Traders!

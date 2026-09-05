@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { productAPI } from '../services/api';
-import { PlusCircle, Search, Edit3, Trash2, ArrowLeft, Loader, AlertTriangle, CheckCircle, XCircle, Printer, Barcode, Tag } from 'lucide-react';
+import { PlusCircle, Search, Edit3, Trash2, ArrowLeft, Loader, AlertTriangle, CheckCircle, XCircle, Printer, Barcode, Tag, Sparkles } from 'lucide-react';
 import BarcodeGeneratorModal from '../components/BarcodeGeneratorModal';
 
 const ProductCatalog = ({ setCurrentPage, goBack }) => {
@@ -312,14 +312,56 @@ const ProductCatalog = ({ setCurrentPage, goBack }) => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Barcode / SKU (बारकोड नंबर)</label>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="Scan barcode or leave blank to auto-use product code"
-                value={prodForm.barcode} 
-                onChange={e => setProdForm({...prodForm, barcode: e.target.value})} 
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>Barcode / SKU (बारकोड नंबर)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const randomCode = 'GT' + Math.floor(100000 + Math.random() * 900000);
+                    setProdForm({ ...prodForm, barcode: randomCode });
+                  }}
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    color: '#3b82f6',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <Sparkles size={12} /> Auto-Generate for Loose Item
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="Scan barcode or click Auto-Generate"
+                  value={prodForm.barcode} 
+                  onChange={e => setProdForm({...prodForm, barcode: e.target.value})} 
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    const randomCode = 'GT' + Math.floor(100000 + Math.random() * 900000);
+                    setProdForm({ ...prodForm, barcode: randomCode });
+                  }}
+                  title="Generate barcode for loose or unbranded item"
+                >
+                  ⚡ Generate
+                </button>
+              </div>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                For loose items (sugar, pulses, spices), click "Auto-Generate" to create a unique barcode sticker.
+              </small>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

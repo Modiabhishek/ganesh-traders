@@ -763,10 +763,13 @@ const POS = ({ setCurrentPage, goBack }) => {
           <div className="glass-panel" style={{ background: 'var(--bg-primary)', padding: '2rem', borderRadius: '16px', maxWidth: '380px', width: '100%', textAlign: 'center' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', fontWeight: 800 }}>Scan & Pay via UPI</h3>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ganesh Traders (PhonePe / GPay / Paytm)</p>
+            <div style={{ marginTop: '0.5rem', display: 'inline-block', background: 'rgba(59, 130, 246, 0.1)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700 }}>
+              UPI ID: <code style={{ letterSpacing: '0.5px' }}>7023062391-2@ybl</code>
+            </div>
             
             <div style={{ background: '#ffffff', padding: '1.25rem', borderRadius: '12px', margin: '1.25rem auto', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
               <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=ganeshtraders@upi&pn=Ganesh%20Traders&am=${grandTotal.toFixed(2)}&cu=INR`)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${grandTotal.toFixed(2)}&cu=INR`)}`}
                 alt="UPI QR Code" 
                 style={{ width: '180px', height: '180px', display: 'block' }}
               />
@@ -865,6 +868,7 @@ const POS = ({ setCurrentPage, goBack }) => {
 
               <div style={{ textAlign: 'center', marginTop: '16px', borderTop: '1px dashed #000', paddingTop: '8px', fontSize: '11px' }}>
                 <div>* Thank You! Please Visit Again *</div>
+                <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>UPI: 7023062391-2@ybl</div>
                 <div style={{ fontSize: '9px', marginTop: '2px' }}>Ganesh Traders Billing System</div>
               </div>
             </div>
