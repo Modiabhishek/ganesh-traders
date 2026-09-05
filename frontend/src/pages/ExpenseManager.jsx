@@ -1,36 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { transactionAPI } from '../services/api';
 import { PlusCircle, Trash2, ArrowLeft, Loader, Printer, Landmark, DollarSign, Calendar } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    const isRender = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('onrender.com');
-    let workingStr = dateStr;
-    if (isRender && !dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-
-    // If it has a timezone offset, let the browser parse it natively to handle local timezone conversion.
-    if (workingStr.includes('Z') || workingStr.includes('+') || (workingStr.includes('-') && workingStr.split('-').length > 3)) {
-      return new Date(workingStr);
-    }
-    // Otherwise, parse it as a local naive date.
-    const parts = workingStr.replace('T', ' ').split(' ');
-    const dateParts = parts[0].split('-');
-    const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
-    return new Date(
-      parseInt(dateParts[0], 10),
-      parseInt(dateParts[1], 10) - 1,
-      parseInt(dateParts[2], 10),
-      parseInt(timeParts[0], 10),
-      parseInt(timeParts[1], 10)
-    );
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDate } from '../utils/dateUtils';
 
 const ExpenseManager = ({ setCurrentPage, goBack }) => {
   const [expenses, setExpenses] = useState([]);
@@ -299,7 +270,7 @@ const ExpenseManager = ({ setCurrentPage, goBack }) => {
                   <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Calendar size={13} />
-                      {parseNaiveDate(exp.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {formatISTDate(exp.date, { day: '2-digit', month: 'short', year: 'numeric' })}
                     </div>
                   </td>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{exp.category}</td>

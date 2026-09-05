@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { customerAPI, productAPI, transactionAPI } from '../services/api';
 import { PlusCircle, ArrowUpRight, DollarSign, Users, AlertTriangle, FileText, Upload } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDate } from '../utils/dateUtils';
 
 const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
   const [metrics, setMetrics] = useState({
@@ -58,20 +45,20 @@ const Dashboard = ({ setCurrentPage, setSelectCustomerId }) => {
         // Load Today's transactions
         const sales = await transactionAPI.getSales();
         const payments = await transactionAPI.getPayments();
-        const todayStr = new Date().toDateString();
+        const todayIST = formatISTDate(new Date());
 
         let todaySalesSum = 0;
         let todayCollectionSum = 0;
 
         sales.forEach(s => {
-          if (s.status === 'Active' && parseNaiveDate(s.sale_date).toDateString() === todayStr) {
+          if (s.status === 'Active' && formatISTDate(s.sale_date) === todayIST) {
             todaySalesSum += parseFloat(s.total_amount) || 0;
             todayCollectionSum += parseFloat(s.paid_amount) || 0;
           }
         });
 
         payments.forEach(p => {
-          if (p.status === 'Active' && parseNaiveDate(p.payment_date).toDateString() === todayStr) {
+          if (p.status === 'Active' && formatISTDate(p.payment_date) === todayIST) {
             todayCollectionSum += parseFloat(p.amount) || 0;
           }
         });

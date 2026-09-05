@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { productAPI, customerAPI, transactionAPI } from '../services/api';
+import { productAPI, customerAPI, transactionAPI, billAPI } from '../services/api';
+import { formatISTDate, formatISTTime, formatISTDateTime } from '../utils/dateUtils';
 import { 
   ArrowLeft, Search, Barcode, ShoppingCart, Trash2, Plus, Minus, 
   Printer, CheckCircle2, AlertCircle, X, CreditCard, Banknote, 
   QrCode, User, RefreshCw, Volume2, VolumeX, Sparkles, History,
-  FileText, ExternalLink
+  FileText, ExternalLink, Percent, Layers
 } from 'lucide-react';
 
 const POS = ({ setCurrentPage, goBack }) => {
@@ -20,10 +21,25 @@ const POS = ({ setCurrentPage, goBack }) => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const scanInputRef = useRef(null);
 
-  // Cart state
-  const [cart, setCart] = useState([]);
+  // Cart state with persistence
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pos_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pos_cart', JSON.stringify(cart));
+    } catch (e) {}
+  }, [cart]);
+
   const [discount, setDiscount] = useState('0');
   const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percent'
+  const [isInterstate, setIsInterstate] = useState(false);
 
   // Customer state
   const [customers, setCustomers] = useState([]);
@@ -32,8 +48,10 @@ const POS = ({ setCurrentPage, goBack }) => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   // Payment state
-  const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash', 'UPI', 'Credit'
+  const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash', 'UPI', 'Credit', 'Split'
   const [tenderAmount, setTenderAmount] = useState('');
+  const [splitCash, setSplitCash] = useState('');
+  const [splitUpi, setSplitUpi] = useState('');
   const [showUpiModal, setShowUpiModal] = useState(false);
 
   // Completed sale & Receipt state
@@ -148,13 +166,11 @@ const POS = ({ setCurrentPage, goBack }) => {
     setShowReceiptModal(true);
   };
 
-  // Compute today's sales and revenues
-  const todayStr = new Date().toDateString();
+  // Compute today's sales and revenues in Indian Standard Time (IST)
+  const todayISTStr = formatISTDate(new Date());
   const todaySales = recentSales.filter(s => {
     try {
-      const dateStr = s.sale_date;
-      const d = dateStr ? (dateStr.includes('Z') || dateStr.includes('+') ? new Date(dateStr) : new Date(dateStr + 'Z')) : new Date();
-      return s.status === 'Active' && d.toDateString() === todayStr;
+      return s.status === 'Active' && formatISTDate(s.sale_date) === todayISTStr;
     } catch (e) {
       return false;
     }
@@ -198,6 +214,10 @@ const POS = ({ setCurrentPage, goBack }) => {
           unit: product.unit,
           pack_size: product.pack_size,
           price: parseFloat(product.selling_price || 0),
+          mrp: parseFloat(product.mrp || product.selling_price || 0),
+          tax_rate: parseFloat(product.tax_rate || 0),
+          is_tax_inclusive: product.is_tax_inclusive !== undefined ? product.is_tax_inclusive : true,
+          hsn_code: product.hsn_code || '',
           quantity: qtyToAdd
         }];
       }
@@ -287,7 +307,9 @@ const POS = ({ setCurrentPage, goBack }) => {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const discountVal = parseFloat(discount) || 0;
   const discountAmount = discountType === 'percent' ? (subtotal * discountVal) / 100 : discountVal;
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  const rawTotal = Math.max(0, subtotal - discountAmount);
+  const grandTotal = Math.round(rawTotal);
+  const roundOff = grandTotal - rawTotal;
   
   const tenderVal = parseFloat(tenderAmount) || 0;
   const changeDue = Math.max(0, tenderVal - grandTotal);
@@ -317,40 +339,71 @@ const POS = ({ setCurrentPage, goBack }) => {
     try {
       const itemsPayload = cart.map(item => ({
         product_id: item.product_id,
-        quantity: parseFloat(item.quantity),
-        price: parseFloat(item.price),
-        unit_price: parseFloat(item.price)
+        product_name: item.name,
+        barcode: item.barcode || item.product_code,
+        hsn_code: item.hsn_code || null,
+        qty: parseFloat(item.quantity),
+        unit: item.unit || 'piece',
+        mrp: parseFloat(item.mrp || item.price),
+        sale_price: parseFloat(item.price),
+        tax_rate: parseFloat(item.tax_rate || 0),
+        is_tax_inclusive: item.is_tax_inclusive !== undefined ? item.is_tax_inclusive : true,
+        discount_pct: 0,
+        discount_amt: 0
       }));
 
-      const paidVal = paymentMode === 'Credit' ? 0.00 : (tenderVal > 0 ? Math.min(tenderVal, grandTotal) : grandTotal);
+      let paymentsPayload = [];
+      if (paymentMode === 'Split') {
+        const cVal = parseFloat(splitCash) || 0;
+        const uVal = parseFloat(splitUpi) || 0;
+        if (cVal > 0) paymentsPayload.push({ mode: 'Cash', amount: cVal });
+        if (uVal > 0) paymentsPayload.push({ mode: 'UPI', amount: uVal });
+      } else if (paymentMode === 'Credit') {
+        paymentsPayload = [];
+      } else {
+        const paidVal = tenderVal > 0 ? Math.min(tenderVal, grandTotal) : grandTotal;
+        paymentsPayload.push({ mode: paymentMode, amount: paidVal });
+      }
 
-      const saleData = {
+      const billPayload = {
         customer_id: selectedCustomer ? selectedCustomer.id : null,
+        customer_name: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer (नकद ग्राहक)',
+        customer_gstin: selectedCustomer?.gstin || null,
+        is_interstate: isInterstate,
+        bill_discount: discountAmount,
         items: itemsPayload,
-        discount: discountAmount,
-        paid_amount: paidVal,
-        payment_method: paymentMode,
-        payment_mode: paymentMode,
+        payments: paymentsPayload,
         notes: `POS Terminal Sale ${selectedCustomer ? `(${selectedCustomer.name})` : '(Walk-in)'}`
       };
 
-      const result = await transactionAPI.createSale(saleData);
+      const result = await billAPI.finalize(billPayload);
       
       playAudio('success');
 
       // Prepare completed sale object for printable receipt
       const saleReceipt = {
         id: result.id,
-        invoice_number: result.sale_number || `SALE-${result.id || Date.now().toString().slice(-6)}`,
-        created_at: result.sale_date || new Date().toISOString(),
-        customer_name: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer (नकद ग्राहक)',
+        invoice_number: result.bill_no,
+        financial_year: result.financial_year,
+        created_at: result.date || new Date().toISOString(),
+        customer_name: result.customer_name,
+        customer_gstin: result.customer_gstin,
         customer_mobile: selectedCustomer ? selectedCustomer.mobile : null,
-        items: [...cart],
-        subtotal: subtotal,
-        discount: discountAmount,
-        grand_total: grandTotal,
-        payment_mode: paymentMode,
-        tender_amount: tenderVal > 0 ? tenderVal : grandTotal,
+        items: result.items || [...cart],
+        tax_slabs: result.tax_slabs || [],
+        subtotal: result.subtotal,
+        discount: result.total_discount,
+        taxable_amount: result.taxable_amount,
+        cgst_amount: result.cgst_amount,
+        sgst_amount: result.sgst_amount,
+        igst_amount: result.igst_amount,
+        total_tax_amount: result.total_tax_amount,
+        round_off: result.round_off,
+        grand_total: result.grand_total,
+        payment_mode: result.payment_mode,
+        paid_amount: result.paid_amount,
+        due_amount: result.due_amount,
+        tender_amount: tenderVal > 0 ? tenderVal : result.paid_amount,
         change_due: changeDue
       };
 
@@ -359,8 +412,11 @@ const POS = ({ setCurrentPage, goBack }) => {
 
       // Reset cart
       setCart([]);
+      localStorage.removeItem('pos_cart');
       setDiscount('0');
       setTenderAmount('');
+      setSplitCash('');
+      setSplitUpi('');
       setSelectedCustomer(null);
       setBarcodeInput('');
       if (scanInputRef.current) {
@@ -744,8 +800,16 @@ const POS = ({ setCurrentPage, goBack }) => {
               </div>
             </div>
 
+            {/* Round-off row */}
+            {roundOff !== 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                <span>Round Off:</span>
+                <span>{roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</span>
+              </div>
+            )}
+
             {/* GRAND TOTAL ROW */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0.5rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', margin: '0.5rem 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0.5rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', margin: '0.35rem 0' }}>
               <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>GRAND TOTAL:</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
                 ₹{grandTotal.toFixed(2)}
@@ -753,32 +817,85 @@ const POS = ({ setCurrentPage, goBack }) => {
             </div>
 
             {/* Payment Mode Selector */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.35rem', margin: '0.65rem 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem', margin: '0.5rem 0' }}>
               <button 
                 type="button" 
                 className={`btn ${paymentMode === 'Cash' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'center' }}
+                style={{ padding: '0.35rem 0.2rem', fontSize: '0.75rem', justifyContent: 'center' }}
                 onClick={() => setPaymentMode('Cash')}
               >
-                <Banknote size={14} /> Cash
+                <Banknote size={13} /> Cash
               </button>
               <button 
                 type="button" 
                 className={`btn ${paymentMode === 'UPI' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'center' }}
+                style={{ padding: '0.35rem 0.2rem', fontSize: '0.75rem', justifyContent: 'center' }}
                 onClick={() => { setPaymentMode('UPI'); setShowUpiModal(true); }}
               >
-                <QrCode size={14} /> UPI / QR
+                <QrCode size={13} /> UPI / QR
               </button>
               <button 
                 type="button" 
                 className={`btn ${paymentMode === 'Credit' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'center' }}
+                style={{ padding: '0.35rem 0.2rem', fontSize: '0.75rem', justifyContent: 'center' }}
                 onClick={() => setPaymentMode('Credit')}
               >
-                <CreditCard size={14} /> Khata
+                <CreditCard size={13} /> Khata
+              </button>
+              <button 
+                type="button" 
+                className={`btn ${paymentMode === 'Split' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.35rem 0.2rem', fontSize: '0.75rem', justifyContent: 'center' }}
+                onClick={() => {
+                  setPaymentMode('Split');
+                  if (!splitCash && !splitUpi) {
+                    setSplitCash(Math.floor(grandTotal / 2).toString());
+                    setSplitUpi((grandTotal - Math.floor(grandTotal / 2)).toString());
+                  }
+                }}
+              >
+                <Layers size={13} /> Split
               </button>
             </div>
+
+            {/* Split Payment Inputs */}
+            {paymentMode === 'Split' && (
+              <div style={{ background: 'var(--bg-secondary)', padding: '0.5rem 0.75rem', borderRadius: '8px', marginBottom: '0.5rem', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>Cash Paid ₹:</label>
+                    <input 
+                      type="number" 
+                      className="input-field" 
+                      value={splitCash}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setSplitCash(val);
+                        const c = parseFloat(val) || 0;
+                        setSplitUpi(Math.max(0, grandTotal - c).toString());
+                      }}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>UPI Paid ₹:</label>
+                    <input 
+                      type="number" 
+                      className="input-field" 
+                      value={splitUpi}
+                      onChange={e => setSplitUpi(e.target.value)}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                  <span>Total Split: <strong>₹{((parseFloat(splitCash) || 0) + (parseFloat(splitUpi) || 0)).toFixed(2)}</strong></span>
+                  <span style={{ color: ((parseFloat(splitCash) || 0) + (parseFloat(splitUpi) || 0)) === grandTotal ? '#10b981' : '#f59e0b', fontWeight: 700 }}>
+                    {((parseFloat(splitCash) || 0) + (parseFloat(splitUpi) || 0)) === grandTotal ? 'Exact Match' : `Diff: ₹${(grandTotal - ((parseFloat(splitCash) || 0) + (parseFloat(splitUpi) || 0))).toFixed(2)}`}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Tender & Change Return (for Cash mode) */}
             {paymentMode === 'Cash' && (
@@ -896,30 +1013,39 @@ const POS = ({ setCurrentPage, goBack }) => {
                 <div style={{ fontSize: '16px', fontWeight: 'bold' }}>GANESH TRADERS</div>
                 <div style={{ fontSize: '11px' }}>।। श्री गणेशाय नमः ।।</div>
                 <div style={{ fontSize: '11px' }}>Kirana, General & Crop Merchant</div>
-                <div style={{ fontSize: '10px', marginTop: '4px' }}>Date: {new Date(completedSale.created_at).toLocaleDateString()} {new Date(completedSale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                <div style={{ fontSize: '10px' }}>Invoice: {completedSale.invoice_number}</div>
+                <div style={{ fontSize: '10px', marginTop: '2px', fontWeight: 'bold' }}>GSTIN: 08AAAAA0000A1Z5</div>
+                <div style={{ fontSize: '10px', marginTop: '4px' }}>Date: {formatISTDate(completedSale.created_at)} {formatISTTime(completedSale.created_at)}</div>
+                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>Bill No: {completedSale.invoice_number}</div>
                 <div style={{ fontSize: '10px' }}>Customer: {completedSale.customer_name}</div>
+                {completedSale.customer_gstin && <div style={{ fontSize: '10px' }}>Cust GSTIN: {completedSale.customer_gstin}</div>}
               </div>
 
               <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', margin: '6px 0' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', fontWeight: 'bold' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontWeight: 'bold', fontSize: '11px' }}>
                   <div>Item</div>
                   <div style={{ textAlign: 'center' }}>Qty</div>
+                  <div style={{ textAlign: 'right' }}>Rate</div>
                   <div style={{ textAlign: 'right' }}>Total</div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '10px' }}>
+              <div style={{ marginBottom: '8px' }}>
                 {completedSale.items.map((it, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', margin: '3px 0' }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
-                    <div style={{ textAlign: 'center' }}>{it.quantity} {it.unit}</div>
-                    <div style={{ textAlign: 'right' }}>₹{(it.price * it.quantity).toFixed(2)}</div>
+                  <div key={idx} style={{ margin: '3px 0' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '11px' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product_name || it.name}</div>
+                      <div style={{ textAlign: 'center' }}>{it.qty || it.quantity} {it.unit}</div>
+                      <div style={{ textAlign: 'right' }}>₹{(it.sale_price || it.price).toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{(it.line_total || (it.price * it.quantity)).toFixed(2)}</div>
+                    </div>
+                    {it.hsn_code && (
+                      <div style={{ fontSize: '9px', color: '#555' }}>HSN: {it.hsn_code} | GST: {it.tax_rate}%</div>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <div style={{ borderTop: '1px dashed #000', paddingTop: '6px' }}>
+              <div style={{ borderTop: '1px dashed #000', paddingTop: '6px', fontSize: '11px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Subtotal:</span>
                   <span>₹{completedSale.subtotal.toFixed(2)}</span>
@@ -930,14 +1056,50 @@ const POS = ({ setCurrentPage, goBack }) => {
                     <span>-₹{completedSale.discount.toFixed(2)}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', margin: '4px 0' }}>
-                  <span>TOTAL:</span>
+                {completedSale.taxable_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                    <span>Taxable Value:</span>
+                    <span>₹{completedSale.taxable_amount.toFixed(2)}</span>
+                  </div>
+                )}
+                {completedSale.cgst_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                    <span>CGST:</span>
+                    <span>₹{completedSale.cgst_amount.toFixed(2)}</span>
+                  </div>
+                )}
+                {completedSale.sgst_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                    <span>SGST:</span>
+                    <span>₹{completedSale.sgst_amount.toFixed(2)}</span>
+                  </div>
+                )}
+                {completedSale.igst_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                    <span>IGST:</span>
+                    <span>₹{completedSale.igst_amount.toFixed(2)}</span>
+                  </div>
+                )}
+                {completedSale.round_off !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                    <span>Round Off:</span>
+                    <span>{completedSale.round_off > 0 ? `+₹${completedSale.round_off.toFixed(2)}` : `-₹${Math.abs(completedSale.round_off).toFixed(2)}`}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', margin: '4px 0', borderTop: '1px solid #000', paddingTop: '4px' }}>
+                  <span>GRAND TOTAL:</span>
                   <span>₹{completedSale.grand_total.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span>Paid ({completedSale.payment_mode}):</span>
-                  <span>₹{completedSale.tender_amount.toFixed(2)}</span>
+                  <span>₹{(completedSale.paid_amount || completedSale.tender_amount || completedSale.grand_total).toFixed(2)}</span>
                 </div>
+                {completedSale.due_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#b91c1c' }}>
+                    <span>Balance Due (Khata):</span>
+                    <span>₹{completedSale.due_amount.toFixed(2)}</span>
+                  </div>
+                )}
                 {completedSale.change_due > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
                     <span>Change Return:</span>
@@ -946,10 +1108,37 @@ const POS = ({ setCurrentPage, goBack }) => {
                 )}
               </div>
 
-              <div style={{ textAlign: 'center', marginTop: '16px', borderTop: '1px dashed #000', paddingTop: '8px', fontSize: '11px' }}>
+              {/* Tax Slab Summary Table */}
+              {completedSale.tax_slabs && completedSale.tax_slabs.length > 0 && (
+                <div style={{ marginTop: '8px', borderTop: '1px dotted #000', paddingTop: '4px', fontSize: '9px' }}>
+                  <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '2px' }}>GST Tax Slab Summary</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontWeight: 'bold' }}>
+                    <div>Rate</div>
+                    <div style={{ textAlign: 'right' }}>Taxable</div>
+                    <div style={{ textAlign: 'right' }}>CGST+SGST</div>
+                    <div style={{ textAlign: 'right' }}>Tax Total</div>
+                  </div>
+                  {completedSale.tax_slabs.map((s, sIdx) => (
+                    <div key={sIdx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+                      <div>{s.tax_rate}%</div>
+                      <div style={{ textAlign: 'right' }}>₹{s.taxable_amount.toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{(s.cgst_amount + s.sgst_amount).toFixed(2)}</div>
+                      <div style={{ textAlign: 'right' }}>₹{s.tax_amount.toFixed(2)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* QR Code & Footer */}
+              <div style={{ textAlign: 'center', marginTop: '12px', borderTop: '1px dashed #000', paddingTop: '8px', fontSize: '11px' }}>
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${completedSale.grand_total.toFixed(2)}&tn=${completedSale.invoice_number}&cu=INR`)}`}
+                  alt="UPI QR" 
+                  style={{ width: '80px', height: '80px', display: 'block', margin: '4px auto' }}
+                />
                 <div>* Thank You! Please Visit Again *</div>
                 <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>UPI: 7023062391-2@ybl</div>
-                <div style={{ fontSize: '9px', marginTop: '2px' }}>Ganesh Traders Billing System</div>
+                <div style={{ fontSize: '9px', marginTop: '2px' }}>Ganesh Traders POS System</div>
               </div>
             </div>
 
@@ -1038,9 +1227,8 @@ const POS = ({ setCurrentPage, goBack }) => {
                   </thead>
                   <tbody>
                     {recentSales.slice(0, 30).map((sale) => {
-                      const d = sale.sale_date ? (sale.sale_date.includes('Z') || sale.sale_date.includes('+') ? new Date(sale.sale_date) : new Date(sale.sale_date + 'Z')) : new Date();
-                      const saleTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const saleDate = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+                      const saleTime = formatISTTime(sale.sale_date);
+                      const saleDate = formatISTDate(sale.sale_date, { day: '2-digit', month: 'short' });
                       return (
                         <tr key={sale.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>
@@ -1125,6 +1313,10 @@ const POS = ({ setCurrentPage, goBack }) => {
       {/* POS Print CSS for 58mm/80mm thermal slip */}
       <style>{`
         @media print {
+          @page {
+            margin: 0;
+            size: auto;
+          }
           body * {
             visibility: hidden !important;
           }

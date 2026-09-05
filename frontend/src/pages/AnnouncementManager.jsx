@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { customerAPI } from '../services/api';
 import { Bell, PlusCircle, Trash2, RefreshCw, X, AlertCircle } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDateTime } from '../utils/dateUtils';
 
 const AnnouncementManager = ({ setCurrentPage, goBack }) => {
   const [updates, setUpdates] = useState([]);
@@ -126,7 +113,7 @@ const AnnouncementManager = ({ setCurrentPage, goBack }) => {
 
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.25rem', width: '80%' }}>{up.title}</h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '1rem' }}>
-                Published on: {parseNaiveDate(up.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                Published on: {formatISTDateTime(up.created_at)}
               </span>
               <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
                 {up.content}

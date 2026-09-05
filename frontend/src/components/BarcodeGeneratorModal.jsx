@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import JsBarcode from 'jsbarcode';
 import { Printer, X, Tag, Copy, Check } from 'lucide-react';
 
@@ -181,8 +181,13 @@ const BarcodeGeneratorModal = ({ product, products = [], onClose }) => {
                 <div style={{ margin: '4px 0' }}>
                   <svg className={`barcode-svg-${prod.id}`} style={{ width: '100%', maxHeight: '42px' }}></svg>
                 </div>
+                {prod.hsn_code && (
+                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                    HSN: {prod.hsn_code}
+                  </div>
+                )}
                 <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#047857' }}>
-                  MRP: ₹{parseFloat(prod.selling_price || 0).toFixed(2)}
+                  MRP: ₹{parseFloat(prod.mrp || prod.selling_price || 0).toFixed(2)}
                 </div>
               </div>
             ))}

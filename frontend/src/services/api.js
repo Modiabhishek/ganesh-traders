@@ -176,6 +176,38 @@ export const productAPI = {
   lookupBarcode: async (barcode) => {
     const response = await api.get(`/products/lookup-barcode/${encodeURIComponent(barcode)}`);
     return response.data;
+  },
+  getBatchBarcodes: async (productIds) => {
+    const response = await api.post('/products/batch-barcodes', productIds);
+    return response.data;
+  }
+};
+
+export const billAPI = {
+  calculate: async (payload) => {
+    const response = await api.post('/bills/calculate', payload);
+    return response.data;
+  },
+  finalize: async (payload) => {
+    const response = await api.post('/bills/finalize', payload);
+    return response.data;
+  },
+  getBills: async (customerId = '', financialYear = '') => {
+    const params = {};
+    if (customerId) params.customer_id = customerId;
+    if (financialYear) params.financial_year = financialYear;
+    const response = await api.get('/bills/', { params });
+    return response.data;
+  },
+  getBill: async (id) => {
+    const response = await api.get(`/bills/${id}`);
+    return response.data;
+  },
+  voidBill: async (id, reason = '') => {
+    const response = await api.post(`/bills/${id}/void`, null, {
+      params: { reason }
+    });
+    return response.data;
   }
 };
 

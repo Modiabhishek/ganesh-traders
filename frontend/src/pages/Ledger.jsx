@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { customerAPI } from '../services/api';
 import { ArrowLeft, Printer, Phone, Calendar, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDate } from '../utils/dateUtils';
 
 const Ledger = ({ customerId, setCurrentPage, goBack }) => {
   const [ledgerData, setLedgerData] = useState(null);
@@ -177,8 +164,7 @@ const Ledger = ({ customerId, setCurrentPage, goBack }) => {
           </thead>
           <tbody>
             {ledger.map((t, idx) => {
-              const dateObj = parseNaiveDate(t.date);
-              const formattedDate = isNaN(dateObj.getTime()) ? 'Go-Live' : dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+              const formattedDate = !t.date || t.date === 'Go-Live' ? 'Go-Live' : formatISTDate(t.date, { day: '2-digit', month: 'short', year: 'numeric' });
               
               return (
                 <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>

@@ -2,11 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime as dt
-class datetime(dt):
-    @classmethod
-    def utcnow(cls):
-        return dt.now()
+from datetime import datetime
+from ..utils.timezone import get_ist_naive
 from ..database import get_db
 from ..models.customer import Customer
 from ..models.product import Product
@@ -28,6 +25,8 @@ def generate_sale_number(db: Session) -> str:
 def generate_payment_number(db: Session) -> str:
     count = db.query(CustomerPayment).count()
     return f"PMT-{count + 1:05d}"
+
+from ..services.customer_sync import sync_customer_sales_and_payments
 
 @router.post("/sales", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 def create_sale(
@@ -78,7 +77,7 @@ def create_sale(
                 detail=f"Sale exceeds customer credit limit of Rs. {customer.credit_limit}. Current balance: Rs. {customer.current_balance}"
             )
 
-    # Determine payment status
+    # Determine initial payment status
     if due_amount <= 0:
         payment_status = "PAID"
     elif sale_in.paid_amount > 0:
@@ -91,14 +90,16 @@ def create_sale(
     new_sale = Sale(
         sale_number=sale_num,
         customer_id=sale_in.customer_id,
-        sale_date=sale_in.sale_date or datetime.utcnow(),
+        sale_date=sale_in.sale_date or get_ist_naive(),
         subtotal=subtotal,
         discount=sale_in.discount,
         total_amount=total_amount,
+        counter_paid=sale_in.paid_amount,
         paid_amount=sale_in.paid_amount,
         due_amount=due_amount,
         payment_method=sale_in.payment_method,
         payment_status=payment_status,
+        created_at=get_ist_naive(),
         status="Active"
     )
     db.add(new_sale)
@@ -129,9 +130,9 @@ def create_sale(
         )
         db.add(movement)
 
-    # Update Customer balance
-    if customer:
-        customer.current_balance += due_amount
+    # Synchronize customer sales and payments
+    if sale_in.customer_id:
+        sync_customer_sales_and_payments(sale_in.customer_id, db)
 
     db.commit()
     db.refresh(new_sale)
@@ -152,7 +153,7 @@ def receive_payment(
     new_payment = CustomerPayment(
         payment_number=pay_num,
         customer_id=payment_in.customer_id,
-        payment_date=payment_in.payment_date or datetime.utcnow(),
+        payment_date=payment_in.payment_date or get_ist_naive(),
         amount=payment_in.amount,
         payment_method=payment_in.payment_method,
         reference_number=payment_in.reference_number,
@@ -160,9 +161,10 @@ def receive_payment(
         status="Active"
     )
     db.add(new_payment)
+    db.flush()
 
-    # Subtract amount from running due balance
-    customer.current_balance -= payment_in.amount
+    # Reconcile customer sales, settle due sales FIFO, and update customer balance
+    sync_customer_sales_and_payments(payment_in.customer_id, db)
 
     db.commit()
     db.refresh(new_payment)
@@ -224,9 +226,7 @@ def cancel_sale(
             db.add(movement)
 
     if sale.customer_id:
-        customer = db.query(Customer).filter(Customer.id == sale.customer_id).first()
-        if customer:
-            customer.current_balance -= sale.due_amount
+        sync_customer_sales_and_payments(sale.customer_id, db)
 
     db.commit()
     return {"message": f"Sale {sale.sale_number} cancelled and reversed successfully."}
@@ -245,39 +245,26 @@ def update_sale(
     if not sale:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale transaction not found.")
 
-    customer = None
-    if sale.customer_id:
-        customer = db.query(Customer).filter(Customer.id == sale.customer_id).first()
-
-    # 1. Reverse old balance impact
-    if customer:
-        customer.current_balance -= sale.due_amount
-
-    # 2. Update fields
     sale.discount = sale_in.discount
-    sale.paid_amount = sale_in.paid_amount
     sale.payment_method = sale_in.payment_method
 
-    # 3. Recalculate total & due
+    # Recalculate total amount
     sale.total_amount = sale.subtotal - sale_in.discount
-    if sale.total_amount < 0:
+    if sale.total_amount < Decimal("0.00"):
         sale.total_amount = Decimal("0.00")
 
-    sale.due_amount = sale.total_amount - sale_in.paid_amount
-    if sale.due_amount < 0:
-        sale.due_amount = Decimal("0.00")
-
-    # 4. Update payment status
-    if sale.due_amount == 0:
-        sale.payment_status = "PAID"
-    elif sale.paid_amount > 0:
-        sale.payment_status = "PARTIALLY PAID"
+    if sale.customer_id:
+        sale.counter_paid = sale_in.paid_amount
+        sync_customer_sales_and_payments(sale.customer_id, db)
     else:
-        sale.payment_status = "UNPAID"
-
-    # 5. Apply new balance impact
-    if customer:
-        customer.current_balance += sale.due_amount
+        sale.paid_amount = sale_in.paid_amount
+        sale.due_amount = max(Decimal("0.00"), sale.total_amount - sale_in.paid_amount)
+        if sale.due_amount <= Decimal("0.00"):
+            sale.payment_status = "PAID"
+        elif sale.paid_amount > Decimal("0.00"):
+            sale.payment_status = "PARTIALLY PAID"
+        else:
+            sale.payment_status = "DUE"
 
     db.commit()
     db.refresh(sale)
@@ -295,9 +282,8 @@ def cancel_payment(
 
     payment.status = "Cancelled"
 
-    customer = db.query(Customer).filter(Customer.id == payment.customer_id).first()
-    if customer:
-        customer.current_balance += payment.amount
+    if payment.customer_id:
+        sync_customer_sales_and_payments(payment.customer_id, db)
 
     db.commit()
     return {"message": f"Payment {payment.payment_number} cancelled and reversed successfully."}
@@ -320,16 +306,14 @@ def update_payment(
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
 
-    # Reverse old payment impact
-    customer.current_balance += payment.amount
-    # Apply new payment impact
-    customer.current_balance -= payment_in.amount
-
     # Update payment details
     payment.amount = payment_in.amount
     payment.payment_method = payment_in.payment_method
     payment.reference_number = payment_in.reference_number
     payment.notes = payment_in.notes
+
+    if payment.customer_id:
+        sync_customer_sales_and_payments(payment.customer_id, db)
 
     db.commit()
     db.refresh(payment)
@@ -342,7 +326,7 @@ def create_expense(
     current_user: User = Depends(get_current_user)
 ):
     new_exp = Expense(
-        date=expense_in.date or datetime.utcnow(),
+        date=expense_in.date or get_ist_naive(),
         category=expense_in.category,
         amount=expense_in.amount,
         payment_method=expense_in.payment_method,

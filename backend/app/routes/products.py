@@ -63,6 +63,27 @@ def lookup_barcode(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No active product with code '{clean_code}'.")
     return prod
 
+@router.post("/batch-barcodes")
+def get_batch_barcodes(
+    product_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    products = db.query(Product).filter(Product.id.in_(product_ids), Product.status == "Active").all()
+    return [
+        {
+            "id": p.id,
+            "product_code": p.product_code,
+            "barcode": p.barcode or p.product_code,
+            "name": p.name,
+            "mrp": float(p.mrp or p.selling_price),
+            "selling_price": float(p.selling_price),
+            "unit": p.unit,
+            "hsn_code": p.hsn_code or ""
+        }
+        for p in products
+    ]
+
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product_in: ProductCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cat = db.query(Category).filter(Category.id == product_in.category_id).first()
@@ -70,9 +91,14 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")
 
     code = generate_product_code(db)
+    clean_barcode = product_in.barcode.strip() if product_in.barcode else code
+    dup_barcode = db.query(Product).filter(Product.barcode == clean_barcode, Product.status == "Active").first()
+    if dup_barcode:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Barcode '{clean_barcode}' is already assigned to {dup_barcode.name}.")
+
     new_prod = Product(
         product_code=code,
-        barcode=product_in.barcode.strip() if product_in.barcode else code,
+        barcode=clean_barcode,
         name=product_in.name,
         category_id=product_in.category_id,
         brand=product_in.brand,
@@ -80,6 +106,11 @@ def create_product(product_in: ProductCreate, db: Session = Depends(get_db), cur
         pack_size=product_in.pack_size,
         purchase_price=product_in.purchase_price,
         selling_price=product_in.selling_price,
+        mrp=product_in.mrp or product_in.selling_price,
+        tax_rate=product_in.tax_rate,
+        is_tax_inclusive=product_in.is_tax_inclusive,
+        hsn_code=product_in.hsn_code,
+        allow_backorder=product_in.allow_backorder,
         minimum_stock=product_in.minimum_stock,
         current_stock=0.00,
         notes=product_in.notes
@@ -106,6 +137,17 @@ def update_product(
         cat = db.query(Category).filter(Category.id == update_data["category_id"]).first()
         if not cat:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")
+
+    if "barcode" in update_data and update_data["barcode"]:
+        clean_barcode = update_data["barcode"].strip()
+        dup_barcode = db.query(Product).filter(
+            Product.barcode == clean_barcode,
+            Product.status == "Active",
+            Product.id != product_id
+        ).first()
+        if dup_barcode:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Barcode '{clean_barcode}' is already assigned to {dup_barcode.name}.")
+        update_data["barcode"] = clean_barcode
 
     for field, value in update_data.items():
         setattr(prod, field, value)

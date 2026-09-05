@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { transactionAPI } from '../services/api';
 import { Search, Printer, Trash2, ArrowLeft, Loader, Calendar, FileText, CheckCircle, XCircle, X } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDateTime } from '../utils/dateUtils';
 
 const TransactionHistory = ({ setCurrentPage, goBack }) => {
   const [tab, setTab] = useState('sales'); // 'sales' or 'payments'
@@ -261,7 +248,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.925rem' }}>
                     <td style={{ padding: '1rem', fontFamily: 'monospace', fontWeight: 600 }}>{s.sale_number}</td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-                      {parseNaiveDate(s.sale_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {formatISTDateTime(s.sale_date)}
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <strong>{s.customer_name || 'Walk-in Cash Customer'}</strong>
@@ -346,7 +333,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.925rem' }}>
                     <td style={{ padding: '1rem', fontFamily: 'monospace', fontWeight: 600 }}>{p.payment_number}</td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-                      {parseNaiveDate(p.payment_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {formatISTDateTime(p.payment_date)}
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <strong>{p.customer_name}</strong>
@@ -417,7 +404,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
 
               <div style={{ marginBottom: '1rem', borderBottom: '1px dashed #000', paddingBottom: '0.5rem' }}>
                 <p><strong>Invoice ID:</strong> {activeInvoice.sale_number}</p>
-                <p><strong>Date:</strong> {parseNaiveDate(activeInvoice.sale_date).toLocaleString('en-IN')}</p>
+                <p><strong>Date:</strong> {formatISTDateTime(activeInvoice.sale_date)}</p>
                 <p><strong>Customer:</strong> {activeInvoice.customer_name || 'Walk-in Cash Customer'}</p>
               </div>
 

@@ -56,6 +56,7 @@ class SaleResponse(BaseModel):
     subtotal: Decimal
     discount: Decimal
     total_amount: Decimal
+    counter_paid: Optional[Decimal] = None
     paid_amount: Decimal
     due_amount: Decimal
     payment_method: str

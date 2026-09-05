@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { productAPI, cerealAPI } from '../services/api';
 import { Search, Edit3, Trash2, Loader, CheckCircle, ArrowLeft, Printer, RefreshCw, PlusCircle, TrendingUp, TrendingDown, ClipboardList } from 'lucide-react';
-
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { parseISTDate, formatISTDateTime } from '../utils/dateUtils';
 
 const CerealStock = ({ setCurrentPage, goBack }) => {
   const [products, setProducts] = useState([]);
@@ -223,7 +210,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
 
     // Filter transactions to current month
     const currentMonthTxs = transactions.filter(t => {
-      const d = parseNaiveDate(t.created_at);
+      const d = parseISTDate(t.created_at);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     });
 
@@ -564,7 +551,7 @@ const CerealStock = ({ setCurrentPage, goBack }) => {
                 ) : (
                   transactions.map(t => {
                     const prodName = products.find(p => p.id === t.product_id)?.name || 'Unknown Crop';
-                    const txDate = parseNaiveDate(t.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    const txDate = formatISTDateTime(t.created_at);
                     
                     return (
                       <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }}>

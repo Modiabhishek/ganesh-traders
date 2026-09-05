@@ -13,6 +13,7 @@ from ..services.customer_import import parse_csv_for_preview
 from ..dependencies.auth import get_current_user
 from ..models.user import User
 from ..services.auth import get_password_hash
+from ..services.customer_sync import sync_customer_sales_and_payments
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -128,6 +129,9 @@ def update_customer(
     for field, val in update_data.items():
         setattr(cust, field, val)
 
+    if "opening_balance" in update_data:
+        sync_customer_sales_and_payments(cust.id, db)
+
     db.commit()
     db.refresh(cust)
     return cust
@@ -225,14 +229,15 @@ def get_customer_ledger(
             "notes": f"Invoice via {s.payment_method}",
             "items": items_list
         })
-        if s.paid_amount > 0:
+        counter_amt = s.counter_paid if s.counter_paid is not None else (Decimal("0.00") if s.payment_method == "Credit" else s.paid_amount)
+        if counter_amt > 0:
             transactions.append({
                 "date": s.sale_date,
                 "type": "Payment (Sale)",
                 "reference": s.sale_number,
                 "debit": Decimal("0.00"),
-                "credit": s.paid_amount,
-                "notes": f"Paid at time of sale",
+                "credit": counter_amt,
+                "notes": "Paid at time of sale",
                 "items": []
             })
 

@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
-from .models import User, Category, Product
+from .models import User, Category, Product, bill
 from .models.customer import Customer
-from .routes import auth, customers, products, transactions, backup
+from .routes import auth, customers, products, transactions, backup, bills
 from .services.auth import get_password_hash
 from decimal import Decimal
 from sqlalchemy import text
@@ -31,6 +31,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
+app.include_router(bills.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 
 @app.on_event("startup")
@@ -57,7 +58,7 @@ def startup_event():
             db.rollback()
             print("Startup: Legacy users status migration warning:", e)
 
-        # 3. Customer portal & product migrations
+        # 3. Customer portal, product & sales migrations
         for col_def in [
             "ALTER TABLE customers ADD COLUMN portal_username VARCHAR",
             "ALTER TABLE customers ADD COLUMN portal_password_hash VARCHAR",
@@ -65,6 +66,12 @@ def startup_event():
             "ALTER TABLE customers ADD COLUMN fathers_name VARCHAR",
             "ALTER TABLE customers ADD COLUMN reference VARCHAR",
             "ALTER TABLE products ADD COLUMN barcode VARCHAR",
+            "ALTER TABLE products ADD COLUMN mrp NUMERIC(12, 2)",
+            "ALTER TABLE products ADD COLUMN tax_rate NUMERIC(5, 2) DEFAULT 0.00",
+            "ALTER TABLE products ADD COLUMN is_tax_inclusive BOOLEAN DEFAULT 1",
+            "ALTER TABLE products ADD COLUMN hsn_code VARCHAR",
+            "ALTER TABLE products ADD COLUMN allow_backorder BOOLEAN DEFAULT 1",
+            "ALTER TABLE sales ADD COLUMN counter_paid NUMERIC(12, 2) DEFAULT 0.00",
         ]:
             try:
                 db.execute(text(col_def))
@@ -160,6 +167,18 @@ def startup_event():
         except Exception as e:
             db.rollback()
             print("Startup: Categories & Products seeding warning:", e)
+
+        # 8. Reconcile customer sales and ledger balances
+        try:
+            from .services.customer_sync import sync_customer_sales_and_payments
+            active_custs = db.query(Customer).filter(Customer.status == "Active").all()
+            for ac in active_custs:
+                sync_customer_sales_and_payments(ac.id, db)
+            db.commit()
+            print(f"Startup: Successfully synchronized ledger and sales for {len(active_custs)} active customers.")
+        except Exception as e:
+            db.rollback()
+            print("Startup: Customer synchronization warning:", e)
 
     except Exception as e:
         print("Startup: Unexpected error during startup:", e)

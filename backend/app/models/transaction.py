@@ -1,10 +1,11 @@
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime as dt
+from ..utils.timezone import get_ist_naive
 class datetime(dt):
     @classmethod
     def utcnow(cls):
-        return dt.now()
+        return get_ist_naive()
 from ..database import Base
 
 class Sale(Base):
@@ -17,6 +18,7 @@ class Sale(Base):
     subtotal = Column(Numeric(12, 2), default=0.00, nullable=False)
     discount = Column(Numeric(12, 2), default=0.00, nullable=False)
     total_amount = Column(Numeric(12, 2), default=0.00, nullable=False)
+    counter_paid = Column(Numeric(12, 2), default=0.00, nullable=True)
     paid_amount = Column(Numeric(12, 2), default=0.00, nullable=False)
     due_amount = Column(Numeric(12, 2), default=0.00, nullable=False)
     payment_method = Column(String, default="Cash", nullable=False) # "Cash", "UPI", "Card", "Credit"

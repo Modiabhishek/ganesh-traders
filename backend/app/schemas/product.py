@@ -26,6 +26,11 @@ class ProductBase(BaseModel):
     pack_size: Optional[str] = None
     purchase_price: Decimal = Field(default=Decimal("0.00"))
     selling_price: Decimal = Field(default=Decimal("0.00"))
+    mrp: Optional[Decimal] = Field(default=Decimal("0.00"))
+    tax_rate: Decimal = Field(default=Decimal("0.00"))
+    is_tax_inclusive: bool = Field(default=True)
+    hsn_code: Optional[str] = None
+    allow_backorder: bool = Field(default=True)
     minimum_stock: Decimal = Field(default=Decimal("0.00"))
     notes: Optional[str] = None
 
@@ -41,6 +46,11 @@ class ProductUpdate(BaseModel):
     pack_size: Optional[str] = None
     purchase_price: Optional[Decimal] = None
     selling_price: Optional[Decimal] = None
+    mrp: Optional[Decimal] = None
+    tax_rate: Optional[Decimal] = None
+    is_tax_inclusive: Optional[bool] = None
+    hsn_code: Optional[str] = None
+    allow_backorder: Optional[bool] = None
     minimum_stock: Optional[Decimal] = None
     current_stock: Optional[Decimal] = None
     status: Optional[str] = Field(None, pattern="^(Active|Inactive)$")

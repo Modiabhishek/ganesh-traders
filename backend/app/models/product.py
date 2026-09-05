@@ -1,10 +1,11 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime as dt
+from ..utils.timezone import get_ist_naive
 class datetime(dt):
     @classmethod
     def utcnow(cls):
-        return dt.now()
+        return get_ist_naive()
 from ..database import Base
 
 class Category(Base):
@@ -30,6 +31,11 @@ class Product(Base):
     pack_size = Column(String, nullable=True) # e.g. "5 kg", "2 L"
     purchase_price = Column(Numeric(12, 2), default=0.00, nullable=False)
     selling_price = Column(Numeric(12, 2), default=0.00, nullable=False)
+    mrp = Column(Numeric(12, 2), default=0.00, nullable=True)
+    tax_rate = Column(Numeric(5, 2), default=0.00, nullable=False) # 0, 5, 12, 18, 28
+    is_tax_inclusive = Column(Boolean, default=True, nullable=False)
+    hsn_code = Column(String, nullable=True)
+    allow_backorder = Column(Boolean, default=True, nullable=False)
     minimum_stock = Column(Numeric(12, 2), default=0.00, nullable=False)
     current_stock = Column(Numeric(12, 2), default=0.00, nullable=False)
     status = Column(String, default="Active", nullable=False) # "Active", "Inactive"

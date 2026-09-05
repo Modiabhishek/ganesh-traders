@@ -11,19 +11,7 @@ const CUSTOMER_QUOTES = [
   "A satisfied customer is the best business strategy of all."
 ];
 
-const parseNaiveDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (dateStr instanceof Date) return dateStr;
-  try {
-    let workingStr = dateStr;
-    if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-      workingStr = dateStr + 'Z';
-    }
-    return new Date(workingStr);
-  } catch (e) {
-    return new Date(dateStr);
-  }
-};
+import { formatISTDate, formatISTDateTime } from '../utils/dateUtils';
 
 const CustomerPortal = ({ token, onLogout }) => {
   const [customer, setCustomer] = useState(null);
@@ -182,7 +170,7 @@ const CustomerPortal = ({ token, onLogout }) => {
                 <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{update.title}</h3>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {parseNaiveDate(update.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {formatISTDateTime(update.created_at)}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{update.content}</p>
@@ -215,7 +203,7 @@ const CustomerPortal = ({ token, onLogout }) => {
               {ledger.map((item, idx) => (
                 <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }} className="hover-card">
                   <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                    {parseNaiveDate(item.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {formatISTDate(item.date, { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{item.type}</td>
                   <td style={{ padding: '1rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{item.reference}</td>
