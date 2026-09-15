@@ -21,6 +21,7 @@ build/
 
 # Build artifacts
 *.apk
+*.zip
 
 # OS
 .DS_Store
