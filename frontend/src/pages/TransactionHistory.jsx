@@ -400,7 +400,7 @@ const TransactionHistory = ({ setCurrentPage, goBack }) => {
               <div style={{ textAlign: 'center', marginBottom: '1.25rem', borderBottom: '1px dashed #000', paddingBottom: '0.75rem' }}>
                 <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0.2rem 0' }}>GANESH TRADERS</h2>
                 <p style={{ fontSize: '0.8rem', color: '#555' }}>Daily Grocery, Poojs & Household Needs</p>
-                <p style={{ fontSize: '0.8rem', color: '#555' }}>Mobile: +91 98765 43210</p>
+                <p style={{ fontSize: '0.8rem', color: '#555' }}>Mobile: +91 7023062391</p>
               </div>
 
               <div style={{ marginBottom: '1rem', borderBottom: '1px dashed #000', paddingBottom: '0.5rem' }}>

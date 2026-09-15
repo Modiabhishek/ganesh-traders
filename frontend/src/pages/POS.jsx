@@ -1131,6 +1131,7 @@ const POS = ({ setCurrentPage, goBack }) => {
                 <div style={{ fontSize: '11px' }}>।। श्री गणेशाय नमः ।।</div>
                 <div style={{ fontSize: '11px' }}>Kirana, General & Crop Merchant</div>
                 <div style={{ fontSize: '10px', marginTop: '2px', fontWeight: 'bold' }}>GSTIN: 08AAAAA0000A1Z5</div>
+                <div style={{ fontSize: '10px', marginTop: '2px', fontWeight: 'bold' }}>Mob: +91 7023062391</div>
                 <div style={{ fontSize: '10px', marginTop: '4px' }}>Date: {formatISTDate(completedSale.created_at)} {formatISTTime(completedSale.created_at)}</div>
                 <div style={{ fontSize: '10px', fontWeight: 'bold' }}>Bill No: {completedSale.invoice_number}</div>
                 <div style={{ fontSize: '10px' }}>Customer: {completedSale.customer_name}</div>
@@ -1259,7 +1260,7 @@ const POS = ({ setCurrentPage, goBack }) => {
                   style={{ width: '80px', height: '80px', display: 'block', margin: '4px auto' }}
                 />
                 <div>* Thank You! Please Visit Again *</div>
-                <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>UPI: 7023062391-2@ybl</div>
+                <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>UPI: 7023062391-2@ybl | Mob: 7023062391</div>
                 <div style={{ fontSize: '9px', marginTop: '2px' }}>Ganesh Traders POS System</div>
               </div>
             </div>
