@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { productAPI, customerAPI, transactionAPI, billAPI } from '../services/api';
 import { formatISTDate, formatISTTime, formatISTDateTime } from '../utils/dateUtils';
+import QRCode from 'qrcode';
 import { 
   ArrowLeft, Search, Barcode, ShoppingCart, Trash2, Plus, Minus, 
   Printer, CheckCircle2, AlertCircle, X, CreditCard, Banknote, 
@@ -59,6 +60,8 @@ const POS = ({ setCurrentPage, goBack }) => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState({ text: '', type: '' });
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState('');
+  const [receiptQrDataUrl, setReceiptQrDataUrl] = useState('');
 
   // Transactions & Sales Integration state
   const [recentSales, setRecentSales] = useState([]);
@@ -303,6 +306,28 @@ const POS = ({ setCurrentPage, goBack }) => {
       scanInputRef.current.focus();
     }
   }, []);
+
+  // Generate local offline QR code for UPI checkout modal
+  useEffect(() => {
+    if (showUpiModal && grandTotal > 0) {
+      const upiUrl = `upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${grandTotal.toFixed(2)}&cu=INR`;
+      QRCode.toDataURL(upiUrl, { width: 220, margin: 1 })
+        .then(url => setUpiQrDataUrl(url))
+        .catch(e => console.error('Local UPI QR generation error:', e));
+    }
+  }, [showUpiModal, grandTotal]);
+
+  // Generate local offline QR code for Thermal Receipt modal
+  useEffect(() => {
+    if (completedSale) {
+      const invoiceNo = encodeURIComponent(completedSale.invoice_number || '');
+      const amount = Number(completedSale.grand_total || 0).toFixed(2);
+      const upiUrl = `upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${amount}&tn=${invoiceNo}&cu=INR`;
+      QRCode.toDataURL(upiUrl, { width: 120, margin: 1 })
+        .then(url => setReceiptQrDataUrl(url))
+        .catch(e => console.error('Local receipt QR generation error:', e));
+    }
+  }, [completedSale]);
 
   // Filter products for touch grid
   const filteredProducts = products.filter(p => {
@@ -1083,7 +1108,7 @@ const POS = ({ setCurrentPage, goBack }) => {
             
             <div style={{ background: '#ffffff', padding: '1.25rem', borderRadius: '12px', margin: '1.25rem auto', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
               <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${grandTotal.toFixed(2)}&cu=INR`)}`}
+                src={upiQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${grandTotal.toFixed(2)}&cu=INR`)}`}
                 alt="UPI QR Code" 
                 style={{ width: '180px', height: '180px', display: 'block' }}
               />
@@ -1255,7 +1280,7 @@ const POS = ({ setCurrentPage, goBack }) => {
               {/* QR Code & Footer */}
               <div style={{ textAlign: 'center', marginTop: '12px', borderTop: '1px dashed #000', paddingTop: '8px', fontSize: '11px' }}>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${Number(completedSale.grand_total || 0).toFixed(2)}&tn=${encodeURIComponent(completedSale.invoice_number || '')}&cu=INR`)}`}
+                  src={receiptQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(`upi://pay?pa=7023062391-2@ybl&pn=Ganesh%20Traders&am=${Number(completedSale.grand_total || 0).toFixed(2)}&tn=${encodeURIComponent(completedSale.invoice_number || '')}&cu=INR`)}`}
                   alt="UPI QR" 
                   style={{ width: '80px', height: '80px', display: 'block', margin: '4px auto' }}
                 />
